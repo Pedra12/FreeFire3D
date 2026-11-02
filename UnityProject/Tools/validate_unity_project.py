@@ -28,7 +28,7 @@ except Exception as exc:
 
 version_path = ROOT / "ProjectSettings" / "ProjectVersion.txt"
 version_text = version_path.read_text(encoding="utf-8") if version_path.exists() else ""
-require(bool(re.search(r"^m_EditorVersion: 6000\\.", version_text, re.MULTILINE)),
+require(bool(re.search(r"^m_EditorVersion: 6000\.", version_text, re.MULTILINE)),
         "Unity editor version is not pinned to Unity 6.0.")
 
 required_files = [
