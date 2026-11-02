@@ -1,0 +1,120 @@
+name: Map geometry audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/map-geometry-audit.yml"
+      - "*.zip"
+      - "*.usdz"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-maps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender and image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          python3 -m pip install --user pillow
+      - name: Extract and inspect map geometry
+        shell: bash
+        run: |
+          mkdir -p /tmp/map-assets audit
+          python3 - <<'PY'
+          import zipfile, io, pathlib, json, re
+          root=pathlib.Path('/tmp/map-assets')
+          report={'note':'Read-only inspection. Repository source files are not modified.','maps':[]}
+          def walk(label, raw, depth=0):
+              try:
+                  with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                      for info in z.infolist():
+                          if info.is_dir(): continue
+                          name=pathlib.PurePosixPath(info.filename).name
+                          data=z.read(info)
+                          ext=pathlib.Path(name).suffix.lower()
+                          if ext=='.zip' and depth<5:
+                              walk(label+'!'+info.filename,data,depth+1)
+                          elif ext in ('.blend','.obj','.mtl','.gltf','.glb','.fbx','.png','.jpg','.jpeg'):
+                              safe=re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+info.filename)
+                              p=root/safe
+                              p.parent.mkdir(parents=True,exist_ok=True)
+                              p.write_bytes(data)
+                              if ext in ('.blend','.obj'):
+                                  report['maps'].append({'source':label,'path':str(p),'format':ext,'bytes':len(data)})
+              except Exception as e:
+                  report.setdefault('errors',[]).append({'source':label,'error':str(e)[:300]})
+          for p in pathlib.Path('.').iterdir():
+              if p.suffix.lower() in ('.zip','.usdz'):
+                  walk(p.name,p.read_bytes())
+          for item in report['maps']:
+              if item['format']=='.obj':
+                  text=pathlib.Path(item['path']).read_text(errors='replace')
+                  verts=[]; uv=0; faces=0; groups=[]; mats=[]
+                  for line in text.splitlines():
+                      if line.startswith('v '):
+                          try: verts.append(tuple(map(float,line.split()[1:4])))
+                          except: pass
+                      elif line.startswith('vt '): uv+=1
+                      elif line.startswith('f '): faces+=1
+                      elif line.startswith(('o ','g ')): groups.append(line[2:].strip())
+                      elif line.startswith('usemtl '): mats.append(line[7:].strip())
+                  if verts:
+                      item['geometry']={'vertices':len(verts),'uvs':uv,'faces':faces,
+                        'bounds':{axis:[min(v[i] for v in verts),max(v[i] for v in verts)] for i,axis in enumerate('xyz')},
+                        'object_groups':groups[:100],'materials_used':sorted(set(mats))}
+          pathlib.Path('audit/map-geometry.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+          PY
+      - name: Inspect Blender scenes
+        shell: bash
+        run: |
+          cat > /tmp/inspect_blend.py <<'PY'
+          import bpy, json, os
+          from mathutils import Vector
+          scene=bpy.context.scene
+          objects=[]
+          for o in scene.objects:
+              item={'name':o.name,'type':o.type,'location':list(o.location),'scale':list(o.scale)}
+              if o.type=='MESH':
+                  item.update({'vertices':len(o.data.vertices),'polygons':len(o.data.polygons),
+                    'materials':[m.name if m else None for m in o.data.materials]})
+                  corners=[o.matrix_world @ Vector(c) for c in o.bound_box]
+                  item['world_bounds']={a:[min(getattr(v,a) for v in corners),max(getattr(v,a) for v in corners)] for a in 'xyz'}
+              objects.append(item)
+          result={'blend_file':bpy.data.filepath,'blender_version':bpy.app.version_string,
+            'scene_objects':len(objects),'mesh_objects':sum(o['type']=='MESH' for o in objects),
+            'materials':[m.name for m in bpy.data.materials],'objects':objects}
+          with open(os.environ['AUDIT_OUT'],'w') as f: json.dump(result,f,indent=2)
+          PY
+          find /tmp/map-assets -type f -name '*.blend' -print0 | while IFS= read -r -d '' f; do
+            base=$(basename "$f")
+            export AUDIT_OUT="audit/blend-$base.json"
+            blender -b "$f" --python /tmp/inspect_blend.py
+          done
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('audit/map-geometry.json')
+          d=json.loads(p.read_text())
+          d['blender_scenes']=[]
+          for f in pathlib.Path('audit').glob('blend-*.json'):
+              d['blender_scenes'].append(json.loads(f.read_text()))
+          p.write_text(json.dumps(d,indent=2),encoding='utf8')
+          print('Inspected map files:',len(d['maps']))
+          print('Blender scenes:',len(d['blender_scenes']))
+          for m in d['maps']:
+              if m.get('geometry'): print(m['source'],m['geometry']['vertices'],'vertices',m['geometry']['faces'],'faces',m['geometry']['bounds'])
+          for b in d['blender_scenes']:
+              print('BLEND',b['blend_file'],'objects',b['scene_objects'],'meshes',b['mesh_objects'],'materials',len(b['materials']))
+          PY
+      - name: Upload map geometry report
+        uses: actions/upload-artifact@v4
+        with:
+          name: freefire3d-map-geometry-audit
+          path: audit/
+          if-no-files-found: error
+          retention-days: 7
