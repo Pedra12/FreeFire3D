@@ -1,4 +1,5 @@
 name: Bermuda Remastered full model audit
+# Evaluate compact 4v4 map suitability, interiors, texture coverage and Android scale
 
 on:
   workflow_dispatch:
