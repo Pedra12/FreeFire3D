@@ -29,12 +29,10 @@ jobs:
         with:
           packages: "platform-tools"
 
-      - name: Install Android build packages and Blender
+      - name: Install Android build packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager --install "platform-tools" "build-tools;36.1.0" "platforms;android-36"
-          sudo apt-get update
-          sudo apt-get install -y blender libegl1 python3-numpy
           mkdir -p build
 
       - name: Download Godot 4.7.2 and Android debug template
@@ -58,122 +56,33 @@ jobs:
           EOF
           "$GODOT_BIN" --version
 
-      - name: Extract original map and Clocktower assets
+      - name: Extract Bermuda Masterizado as the primary complete map
         run: |
-          mkdir -p /tmp/freefire-assets game/assets/maps build
+          mkdir -p game/assets/maps build
           python3 - <<'PY'
-          import zipfile, io, pathlib, re
-          root=pathlib.Path('/tmp/freefire-assets')
-          def walk(label, raw, depth=0):
-              try:
-                  with zipfile.ZipFile(io.BytesIO(raw)) as z:
-                      for item in z.infolist():
-                          if item.is_dir(): continue
-                          ext=pathlib.Path(item.filename).suffix.lower()
-                          data=z.read(item)
-                          if ext=='.zip' and depth<5:
-                              walk(label+'_'+pathlib.Path(item.filename).stem, data, depth+1)
-                          elif ext in ('.blend','.png','.jpg','.jpeg','.webp','.tga'):
-                              name=re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+item.filename)
-                              target=root/name
-                              target.parent.mkdir(parents=True,exist_ok=True)
-                              target.write_bytes(data)
-              except Exception as exc:
-                  raise RuntimeError(f'Archive extraction failed for {label}: {exc}')
-          for archive in sorted(pathlib.Path('.').glob('*.zip')):
-              walk(archive.stem, archive.read_bytes())
-          full=list(root.rglob('*hh.blend'))
-          clock=list(root.rglob('*FF_CLOCKTOWER_BY_RATUL.blend'))
-          if len(full)!=1: raise SystemExit(f'Expected one full map Blender file, found {len(full)}')
-          if len(clock)!=1: raise SystemExit(f'Expected one Clocktower Blender file, found {len(clock)}')
-          print('FULL_MAP',full[0])
-          print('CLOCKTOWER',clock[0])
-          PY
-
-      - name: Convert map to Godot GLB without changing source archives
-        run: |
-          cat > /tmp/export_map.py <<'PY'
-          import bpy, pathlib, json, math, traceback
-          from mathutils import Vector, Matrix
-          from pathlib import Path
-          root=Path('/tmp/freefire-assets')
-          full=next(root.rglob('*hh.blend'))
-          chunk=next(root.rglob('*FF_CLOCKTOWER_BY_RATUL.blend'))
-          bpy.ops.wm.open_mainfile(filepath=str(full))
-          full_meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
-          full_materials={m for o in full_meshes for m in o.data.materials if m}
-          # The full-map source deliberately remains neutral white: its two original
-          # NeoParadise image files are absent from the supplied archives.
-          for mat in full_materials:
-              if not mat.use_nodes or not mat.node_tree: continue
-              bsdf=next((n for n in mat.node_tree.nodes if n.type=='BSDF_PRINCIPLED'),None)
-              if bsdf:
-                  for link in list(mat.node_tree.links):
-                      if link.to_node==bsdf and link.to_socket.name=='Base Color':
-                          mat.node_tree.links.remove(link)
-                  bsdf.inputs['Base Color'].default_value=(0.82,0.82,0.82,1.0)
-                  bsdf.inputs['Roughness'].default_value=0.92
-          # Append the complete Clocktower collection hierarchy.
-          with bpy.data.libraries.load(str(chunk),link=False) as (src,dst):
-              dst.collections=src.collections
-          collections=[]
-          for col in dst.collections:
-              if col is not None:
-                  bpy.context.scene.collection.children.link(col)
-                  collections.append(col)
-          chunk_meshes=list({o for col in collections for o in col.all_objects if o.type=='MESH'})
-          # Convert source Y-up coordinates to Blender Z-up and align the base to the full map.
-          rotate=Matrix.Rotation(math.radians(90),4,'X')
-          translate=Matrix.Translation(Vector((0,0,-20.0)))
-          for obj in chunk_meshes:
-              obj.matrix_world=translate @ rotate @ obj.matrix_world
-          # Reconnect Clocktower texture images by their original filename.
-          loaded=0; missing=[]
-          for mat in {m for o in chunk_meshes for m in o.data.materials if m}:
-              if not mat.use_nodes or not mat.node_tree: continue
-              bsdf=next((n for n in mat.node_tree.nodes if n.type=='BSDF_PRINCIPLED'),None)
-              for node in mat.node_tree.nodes:
-                  if node.type!='TEX_IMAGE' or not node.image: continue
-                  basename=Path(node.image.filepath).name.lower()
-                  matches=[p for p in root.rglob('*') if p.is_file() and p.name.lower().endswith('_'+basename)]
-                  if matches:
-                      try:
-                          node.image=bpy.data.images.load(str(matches[0]),check_existing=True)
-                          loaded+=1
-                      except Exception:
-                          missing.append(basename)
-                  else:
-                      missing.append(basename)
-                      if bsdf:
-                          for link in list(mat.node_tree.links):
-                              if link.from_node==node and link.to_node==bsdf:
-                                  mat.node_tree.links.remove(link)
-          # Keep only actual scene geometry in the export.
-          out=Path('game/assets/maps/full_map_test.glb')
-          out.parent.mkdir(parents=True,exist_ok=True)
-          try:
-              bpy.ops.preferences.addon_enable(module='io_scene_gltf2')
-          except Exception:
-              pass
-          bpy.ops.export_scene.gltf(filepath=str(out),export_format='GLB',export_apply=True,
-                                    export_materials='EXPORT',export_cameras=False,export_lights=False,
-                                    export_yup=True)
-          all_meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
-          points=[o.matrix_world @ Vector(c) for o in all_meshes for c in o.bound_box]
-          report={'source_full_map':full.name,'source_clocktower':chunk.name,
-                  'full_map_mesh_objects':len(full_meshes),'clocktower_mesh_objects':len(chunk_meshes),
-                  'export_mesh_objects':len(all_meshes),'reconnected_texture_nodes':loaded,
-                  'unresolved_texture_names':sorted(set(missing)),
-                  'clocktower_axis_conversion':'Y-up to Z-up (90 degrees around X)',
-                  'clocktower_world_z_offset':-20.0,'glb_bytes':out.stat().st_size}
-          if points:
-              report['world_bounds']={a:[min(getattr(p,a) for p in points),max(getattr(p,a) for p in points)] for a in 'xyz'}
-          Path('build/map-export-report.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+          import zipfile, pathlib, hashlib, json
+          archive=pathlib.Path("bermuda-remastered-free-fire.zip")
+          target=pathlib.Path("game/assets/maps/bermuda_masterizado.glb")
+          with zipfile.ZipFile(archive) as z:
+              matches=[n for n in z.namelist() if n.endswith("free_fire_full_bermuda_remastered.glb")]
+              if len(matches)!=1:
+                  raise SystemExit(f"Expected exactly one Bermuda GLB, found: {matches}")
+              data=z.read(matches[0])
+              if len(data)<1_000_000:
+                  raise SystemExit(f"Bermuda GLB unexpectedly small: {len(data)} bytes")
+              target.write_bytes(data)
+              texture_entries=[n for n in z.namelist() if n.lower().endswith(".png")]
+              if len(texture_entries)!=2:
+                  raise SystemExit(f"Expected 2 embedded texture files, found {texture_entries}")
+          report={"source_archive":str(archive),"source_glb_entry":matches[0],
+                  "target":str(target),"glb_bytes":len(data),
+                  "glb_sha256":hashlib.sha256(data).hexdigest(),
+                  "embedded_textures":texture_entries}
+          pathlib.Path("build/bermuda-primary-map-report.json").write_text(json.dumps(report,indent=2))
           print(json.dumps(report,indent=2))
           PY
-          blender -b --python /tmp/export_map.py 2>&1 | tee build/blender-export.log
-          test -s game/assets/maps/full_map_test.glb
-          ls -lh game/assets/maps/full_map_test.glb
+          test -s game/assets/maps/bermuda_masterizado.glb
+          ls -lh game/assets/maps/bermuda_masterizado.glb
 
       - name: Prepare Android debug signing
         run: |
