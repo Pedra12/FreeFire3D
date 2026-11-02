@@ -186,8 +186,13 @@ func apply_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, _hit_norm
 		alive = false
 		var killer_team := int(source.get("team_id")) if is_instance_valid(source) and source.get("team_id") != null else -1
 		eliminated.emit(team_id, killer_team)
-		_play_action(&"Death")
-		var cleanup_timer := get_tree().create_timer(0.45)
+		var death_clip: StringName = &"Death01" if animation_player != null and animation_player.has_animation(&"Death01") else &"Death"
+		_play_action(death_clip)
+		_spawn_elimination_effect()
+		var cleanup_delay := 0.9
+		if animation_player != null and animation_player.has_animation(death_clip):
+			cleanup_delay = maxf(cleanup_delay, animation_player.get_animation(death_clip).length)
+		var cleanup_timer := get_tree().create_timer(minf(cleanup_delay, 2.0))
 		cleanup_timer.timeout.connect(queue_free)
 		return true
 	return false
@@ -206,6 +211,37 @@ func _show_damage_number(amount: float, at: Vector3) -> void:
 	tween.tween_property(label, "position:y", label.position.y + 0.9, 0.55)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.55)
 	tween.tween_callback(label.queue_free)
+
+func _spawn_elimination_effect() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var burst := Node3D.new()
+	burst.name = "EliminationBurst"
+	scene.add_child(burst)
+	burst.global_position = global_position + Vector3.UP * 0.85
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.055
+	sphere.height = 0.11
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(1.0, 0.25, 0.08, 1.0)
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.12, 0.025, 1.0)
+	for index in range(10):
+		var shard := MeshInstance3D.new()
+		shard.mesh = sphere
+		shard.material_override = material
+		burst.add_child(shard)
+		var angle := TAU * float(index) / 10.0
+		var destination := Vector3(cos(angle) * randf_range(0.35, 0.75), randf_range(-0.1, 0.65), sin(angle) * randf_range(0.35, 0.75))
+		var tween := shard.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(shard, "position", destination, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(shard, "scale", Vector3.ZERO, 0.55)
+	var cleanup := get_tree().create_timer(0.7)
+	cleanup.timeout.connect(burst.queue_free)
+
 
 func _play_footstep() -> void:
 	var audio := get_node_or_null("FootstepAudio") as AudioStreamPlayer3D

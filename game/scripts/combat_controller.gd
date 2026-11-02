@@ -143,6 +143,7 @@ func _fire_once() -> void:
 	var headshot := false
 	var hit_position := origin + base_direction * max_distance
 	var nearest_distance := max_distance
+	var damage_by_target: Dictionary = {}
 
 	for pellet_index in range(pellets_per_shot):
 		var direction := base_direction
@@ -173,11 +174,23 @@ func _fire_once() -> void:
 			var target_node := damage_target as Node3D
 			var is_headshot := candidate_position.y >= target_node.global_position.y + 1.35
 			var applied_damage := headshot_damage if is_headshot else damage
+			var before_health := _read_target_health(damage_target)
 			var damage_result: Variant = damage_target.call("apply_damage", applied_damage, candidate_position, hit.normal, player)
-			confirmed_hit = true
-			headshot = headshot or is_headshot
-			eliminated = eliminated or damage_result == true
+			var after_health := _read_target_health(damage_target)
+			var actual_damage := maxf(0.0, before_health - after_health) if before_health >= 0.0 and after_health >= 0.0 else 0.0
+			if actual_damage > 0.01:
+				var target_key := damage_target.get_instance_id()
+				var damage_data: Dictionary = damage_by_target.get(target_key, {"damage": 0.0, "position": candidate_position, "headshot": false})
+				damage_data["damage"] = float(damage_data["damage"]) + actual_damage
+				damage_data["position"] = candidate_position
+				damage_data["headshot"] = bool(damage_data["headshot"]) or is_headshot
+				damage_by_target[target_key] = damage_data
+				confirmed_hit = true
+				headshot = headshot or is_headshot
+				eliminated = eliminated or damage_result == true
 
+	for damage_data in damage_by_target.values():
+		_show_damage_number(float(damage_data["damage"]), damage_data["position"], bool(damage_data["headshot"]))
 	_show_tracer(origin, hit_position)
 	if is_instance_valid(hud):
 		hud.call("show_hitmarker", confirmed_hit, eliminated, headshot)
@@ -208,6 +221,37 @@ func _on_inventory_changed(_snapshot: Dictionary) -> void:
 		return
 	reserve_ammo = int(inventory.call("get_ammo", current_ammo_type))
 	_emit_ammo()
+
+func _read_target_health(target: Node) -> float:
+	if not is_instance_valid(target):
+		return -1.0
+	var direct_health: Variant = target.get("health")
+	if direct_health != null:
+		return float(direct_health)
+	var health_component := target.get_node_or_null("Health")
+	if health_component != null:
+		return float(health_component.get("current_health"))
+	return -1.0
+
+func _show_damage_number(amount: float, at: Vector3, is_headshot: bool) -> void:
+	var label := Label3D.new()
+	label.text = str(roundi(amount)) + ("!" if is_headshot else "")
+	label.font_size = 48 if is_headshot else 42
+	label.pixel_size = 0.0035
+	label.modulate = Color(1.0, 0.78, 0.22, 1.0) if is_headshot else Color(1.0, 1.0, 1.0, 1.0)
+	label.outline_size = 8
+	label.outline_modulate = Color(0.025, 0.025, 0.035, 1.0)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	scene.add_child(label)
+	label.global_position = at + Vector3.UP * 0.35
+	var tween := label.create_tween()
+	tween.tween_property(label, "global_position", label.global_position + Vector3.UP * 0.8, 0.62)
+	tween.parallel().tween_property(label, "modulate", Color(label.modulate.r, label.modulate.g, label.modulate.b, 0.0), 0.62)
+	tween.tween_callback(label.queue_free)
 
 func _emit_ammo() -> void:
 	ammo_changed.emit(ammo_in_magazine, reserve_ammo)

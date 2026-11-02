@@ -42,6 +42,22 @@ func _should_skip(mesh_instance: MeshInstance3D) -> bool:
 			return true
 	return false
 
+func _is_vaultable(mesh_instance: MeshInstance3D) -> bool:
+	var searchable := mesh_instance.name.to_lower()
+	var mesh := mesh_instance.mesh
+	if mesh == null:
+		return false
+	for surface in range(mesh.get_surface_count()):
+		var material := mesh.surface_get_material(surface)
+		if material != null:
+			searchable += " " + material.resource_name.to_lower()
+			searchable += " " + material.resource_path.to_lower()
+	if searchable.contains("vaultable") or searchable.contains("window") or searchable.contains("sill") or searchable.contains("fence") or searchable.contains("barrier"):
+		return true
+	var dimensions := mesh_instance.get_transformed_aabb().size
+	var horizontal_span := maxf(dimensions.x, dimensions.z)
+	return dimensions.y >= 0.35 and dimensions.y <= 1.45 and horizontal_span >= 0.35 and horizontal_span <= 6.0
+
 func _generate_map_collisions() -> void:
 	var mesh_nodes := find_children("*", "MeshInstance3D", true, false)
 	var generated := 0
@@ -53,7 +69,7 @@ func _generate_map_collisions() -> void:
 			continue
 		var first_new_child := mesh_instance.get_child_count()
 		mesh_instance.create_trimesh_collision()
-		if mesh_instance.name.to_lower().contains("vaultable"):
+		if _is_vaultable(mesh_instance):
 			for child_index in range(first_new_child, mesh_instance.get_child_count()):
 				var collider := mesh_instance.get_child(child_index)
 				if collider is StaticBody3D:

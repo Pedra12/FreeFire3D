@@ -178,20 +178,29 @@ func _try_window_vault(forward: Vector3) -> bool:
 	var obstacle: Object = hit.get("collider")
 	if not obstacle is Node or not (obstacle as Node).is_in_group("vaultable"):
 		return false
-	var landing := global_position + forward * 1.45
-	var ground_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.0, landing + Vector3.DOWN * 2.0)
+	var obstacle_height := float(hit.position.y) - global_position.y
+	if obstacle_height < 0.35 or obstacle_height > 1.45:
+		return false
+	var landing := global_position + forward * 1.8
+	var ground_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 2.5, landing + Vector3.DOWN * 3.0)
 	ground_query.exclude = [get_rid()]
 	var ground_hit := get_world_3d().direct_space_state.intersect_ray(ground_query)
 	if ground_hit.is_empty() or absf(float(ground_hit.position.y) - global_position.y) > 0.85:
 		return false
-	var head_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 0.9, landing + Vector3.UP * 2.0)
-	head_query.exclude = [get_rid()]
-	if not get_world_3d().direct_space_state.intersect_ray(head_query).is_empty():
+	var clearance_shape := CapsuleShape3D.new()
+	clearance_shape.radius = 0.23
+	clearance_shape.height = 1.35
+	var clearance_query := PhysicsShapeQueryParameters3D.new()
+	clearance_query.shape = clearance_shape
+	clearance_query.transform = Transform3D(Basis.IDENTITY, ground_hit.position + Vector3.UP * 0.68)
+	clearance_query.exclude = [get_rid()]
+	if not get_world_3d().direct_space_state.intersect_shape(clearance_query, 8).is_empty():
 		return false
-	global_position = ground_hit.position + Vector3.UP * 0.70
-	velocity = forward * 1.5
-	vault_cooldown = 0.8
-	_play_action_animation([&"Vault_Window", &"Vault", &"Jump"])
+	vault_cooldown = 1.05
+	velocity.x = forward.x * maxf(sprint_speed, 5.5)
+	velocity.z = forward.z * maxf(sprint_speed, 5.5)
+	velocity.y = maxf(jump_velocity * 0.85, 4.0)
+	_play_action_animation([&"ClimbUp_1m", &"Jump_Start", &"Jump_Loop", &"Jump"])
 	return true
 
 func apply_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO, _hit_normal: Vector3 = Vector3.UP, source: Node = null) -> bool:
