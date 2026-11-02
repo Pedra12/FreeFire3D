@@ -113,7 +113,13 @@ for material in bpy.data.materials:
                     candidate = sorted(matches)[0]
         if not candidate.is_file():
             raise SystemExit(f"Texture file not found for material {material.name}: {old_image.filepath}")
-        digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        raw_texture = candidate.read_bytes()
+        signature = raw_texture[:8].hex()
+        png_dimensions = None
+        if raw_texture[:8] == bytes.fromhex("89504e470d0a1a0a") and len(raw_texture) >= 24:
+            png_dimensions = struct.unpack(">II", raw_texture[16:24])
+        print(f"TEXTURE_FILE name={candidate.name} bytes={len(raw_texture)} signature={signature} dimensions={png_dimensions}", flush=True)
+        digest = hashlib.sha256(raw_texture).hexdigest()
         if digest not in loaded_images_by_hash:
             loaded_image = bpy.data.images.load(str(candidate), check_existing=False)
             if not loaded_image.has_data:
