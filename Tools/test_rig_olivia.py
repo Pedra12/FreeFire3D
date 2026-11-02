@@ -144,53 +144,55 @@ def weighted_vertex_count(obj):
     return sum(1 for v in obj.data.vertices if any(g.weight > 0.0001 for g in v.groups))
 
 auto_weighted = 0
-fallback_weighted = 0
+fallback_weighted = len(meshes)
 for obj in meshes:
     world = obj.matrix_world.copy()
-    bpy.ops.object.select_all(action="DESELECT")
-    obj.select_set(True)
-    armature.select_set(True)
-    bpy.context.view_layer.objects.active = armature
-    try:
-        bpy.ops.object.parent_set(type="ARMATURE_AUTO")
-    except Exception as exc:
-        print(f"AUTO_WEIGHT_FAILED {obj.name}: {exc}", flush=True)
-    if obj.parent != armature:
-        obj.parent = armature
-        obj.matrix_world = world
-    modifiers = [m for m in obj.modifiers if m.type == "ARMATURE" and m.object == armature]
-    if not modifiers:
-        modifier = obj.modifiers.new("Olivia_Armature", "ARMATURE")
-        modifier.object = armature
-    if weighted_vertex_count(obj) == len(obj.data.vertices):
-        auto_weighted += 1
-    else:
-        manual_weights(obj)
-        fallback_weighted += 1
+    obj.parent = armature
+    obj.matrix_world = world
+    for modifier in list(obj.modifiers):
+        if modifier.type == "ARMATURE":
+            obj.modifiers.remove(modifier)
+    modifier = obj.modifiers.new("Olivia_Armature", "ARMATURE")
+    modifier.object = armature
+    manual_weights(obj)
     if weighted_vertex_count(obj) != len(obj.data.vertices):
         raise SystemExit(f"Unweighted vertices remain in {obj.name}")
 
-# Test a small pose change and verify that the skinned mesh actually deforms.
-bpy.context.view_layer.update()
-test_mesh = max(meshes, key=lambda obj: len(obj.data.vertices))
-depsgraph = bpy.context.evaluated_depsgraph_get()
-evaluated = test_mesh.evaluated_get(depsgraph)
-evaluated_mesh = evaluated.to_mesh()
-before = [evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices]
-evaluated.to_mesh_clear()
-pose_bone = armature.pose.bones.get("LeftUpperArm")
-if pose_bone is None:
-    raise SystemExit("LeftUpperArm bone missing after rig creation.")
-pose_bone.rotation_mode = "XYZ"
-pose_bone.rotation_euler[0] = 0.12
-bpy.context.view_layer.update()
-depsgraph = bpy.context.evaluated_depsgraph_get()
-evaluated = test_mesh.evaluated_get(depsgraph)
-evaluated_mesh = evaluated.to_mesh()
-after = [evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices]
-evaluated.to_mesh_clear()
+bone_weight_counts = {name: 0 for name in bone_segments}
+for obj in meshes:
+    group_by_index = {g.index: g.name for g in obj.vertex_groups}
+    for vertex in obj.data.vertices:
+        for assignment in vertex.groups:
+            name = group_by_index.get(assignment.group)
+            if name in bone_weight_counts and assignment.weight > 0.0001:
+                bone_weight_counts[name] += 1
+missing_weight_bones = [name for name, count in bone_weight_counts.items() if count == 0]
+if missing_weight_bones:
+    raise SystemExit("Humanoid bones without any weighted vertices: " + ", ".join(missing_weight_bones))
+
+# Test a small pose change and verify that the skinned meshes actually deform.
+def all_deformed_positions():
+    bpy.context.view_layer.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    positions = []
+    for obj in meshes:
+        evaluated = obj.evaluated_get(depsgraph)
+        evaluated_mesh = evaluated.to_mesh()
+        positions.extend(evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices)
+        evaluated.to_mesh_clear()
+    return positions
+
+before = all_deformed_positions()
+for bone_name, angle in (("LeftUpperArm", 0.12), ("LeftLowerArm", -0.08)):
+    pose_bone = armature.pose.bones.get(bone_name)
+    if pose_bone is None:
+        raise SystemExit(f"{bone_name} bone missing after rig creation.")
+    pose_bone.rotation_mode = "XYZ"
+    pose_bone.rotation_euler[0] = angle
+after = all_deformed_positions()
 deformation = max(((a-b).length for a, b in zip(before, after)), default=0.0)
-pose_bone.rotation_euler = (0.0, 0.0, 0.0)
+for pose_bone in armature.pose.bones:
+    pose_bone.rotation_euler = (0.0, 0.0, 0.0)
 bpy.context.view_layer.update()
 if deformation < 0.0001:
     raise SystemExit("Rig pose test produced no measurable mesh deformation.")
@@ -255,6 +257,8 @@ report = {
     "source_vertices": sum(len(o.data.vertices) for o in meshes),
     "armature_bones": len(reimport_armature.data.bones),
     "auto_weighted_meshes": auto_weighted,
+    "manual_weighted_meshes": fallback_weighted,
+    "bone_weight_counts": bone_weight_counts,
     "fallback_weighted_meshes": fallback_weighted,
     "pose_test_max_deformation_m": round(deformation, 6),
     "fbx_size_bytes": out_fbx.stat().st_size,
