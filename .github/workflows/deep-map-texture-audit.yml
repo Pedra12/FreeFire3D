@@ -1,0 +1,120 @@
+name: Deep map texture and USDZ audit
+
+on:
+  push:
+    paths:
+      - ".github/workflows/deep-map-texture-audit.yml"
+      - "docs/run-deep-map-texture-audit.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install image and USD inspection tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pil python3-numpy
+          python3 -m pip install --break-system-packages usd-core
+      - name: Recursively extract all model archives including USDZ
+        run: |
+          mkdir -p /tmp/all-assets audit/images audit/reports
+          python3 - <<'PY'
+          import zipfile,io,pathlib,re,json,hashlib
+          root=pathlib.Path('/tmp/all-assets')
+          rows=[]
+          def safe_name(s): return re.sub(r'[^A-Za-z0-9_.-]+','_',s)
+          def walk(label,raw,depth=0):
+            try:
+              with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                for item in z.infolist():
+                  if item.is_dir(): continue
+                  name=pathlib.Path(item.filename).name
+                  ext=pathlib.Path(name).suffix.lower()
+                  data=z.read(item)
+                  if ext in ('.zip','.usdz') and depth<6:
+                    walk(label+'_'+pathlib.Path(name).stem,data,depth+1)
+                  elif ext in ('.png','.jpg','.jpeg','.webp','.tga','.bmp','.tif','.tiff','.blend','.obj','.mtl','.fbx','.glb','.gltf','.usdc','.usd','.usda'):
+                    target=root/(safe_name(label+'_'+item.filename))
+                    target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+                    rows.append({'archive_chain':label,'original_path':item.filename,'stored_path':str(target),'extension':ext,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+            except Exception as e:
+              rows.append({'archive_chain':label,'error':str(e)[:300]})
+          for p in sorted(pathlib.Path('.').iterdir()):
+            if p.suffix.lower() in ('.zip','.usdz'): walk(p.stem,p.read_bytes())
+          pathlib.Path('audit/reports/extracted-index.json').write_text(json.dumps(rows,indent=2))
+          print('Extracted files:',sum(1 for r in rows if 'stored_path' in r))
+          print('Errors:',[r for r in rows if 'error' in r][:10])
+          PY
+      - name: Inspect all images and create contact sheet
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageDraw,ImageFont
+          from pathlib import Path
+          import json,hashlib
+          root=Path('/tmp/all-assets'); files=[]
+          for p in root.rglob('*'):
+            if p.is_file() and p.suffix.lower() in ('.png','.jpg','.jpeg','.webp','.tga','.bmp','.tif','.tiff'):
+              try:
+                im=Image.open(p); im.load(); im.thumbnail((170,110))
+                files.append((p,im.copy().convert('RGB'),Image.open(p).size))
+              except Exception as e: print('IMAGE_READ_ERROR',p,str(e)[:120])
+          cols=4; cellw=230; cellh=160
+          for start in range(0,len(files),80):
+            group=files[start:start+80]; sheet=Image.new('RGB',(cols*cellw,((len(group)+cols-1)//cols)*cellh),'white'); d=ImageDraw.Draw(sheet)
+            for j,(p,im,size) in enumerate(group):
+              x=(j%cols)*cellw; y=(j//cols)*cellh
+              sheet.paste(im,(x+(170-im.width)//2,y))
+              d.text((x+5,y+112),p.name[:34],fill='black')
+              d.text((x+5,y+128),str(size),fill='black')
+            sheet.save(f'audit/images/contact-{start//80+1:02d}.jpg',quality=88)
+          index=[]
+          for p,im,size in files:
+            index.append({'file':str(p),'name':p.name,'width':size[0],'height':size[1],'bytes':p.stat().st_size})
+          Path('audit/reports/image-index.json').write_text(json.dumps(index,indent=2))
+          print('Readable images:',len(files))
+          for item in index:
+            if any(k in item['name'].lower() for k in ('neo','terrain','topview','paradise','building','road','grass','ground')):
+              print('MAP_TEXTURE_CANDIDATE',item)
+          PY
+      - name: Inspect USDZ scene and texture references
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,traceback
+          out=[]
+          try:
+            from pxr import Usd,UsdGeom,UsdShade,Sdf
+            for p in Path('/tmp/all-assets').rglob('*'):
+              if p.suffix.lower() not in ('.usdc','.usd','.usda'): continue
+              try:
+                stage=Usd.Stage.Open(str(p))
+                if not stage: continue
+                meshes=[]; refs=[]
+                for prim in stage.Traverse():
+                  if prim.IsA(UsdGeom.Mesh):
+                    m=UsdGeom.Mesh(prim); pts=m.GetPointsAttr().Get() or []
+                    meshes.append({'path':str(prim.GetPath()),'points':len(pts)})
+                  for a in prim.GetAttributes():
+                    if a.GetTypeName()==Sdf.ValueTypeNames.Asset:
+                      v=a.Get()
+                      if v: refs.append({'prim':str(prim.GetPath()),'attribute':a.GetName(),'asset':str(v)})
+                out.append({'file':str(p),'meshes':meshes[:300],'mesh_count':len(meshes),'asset_refs':refs[:500]})
+              except Exception as e: out.append({'file':str(p),'error':str(e)[:500]})
+          except Exception as e: out.append({'usd_import_error':str(e),'traceback':traceback.format_exc()[-2000:]})
+          Path('audit/reports/usd-scene-report.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2)[:12000])
+          PY
+      - name: Upload deep audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeFire3D-deep-map-texture-audit
+          path: audit/
+          if-no-files-found: warn
+          retention-days: 14
