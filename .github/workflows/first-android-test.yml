@@ -64,7 +64,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xz-utils unzip curl
-          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
           mkdir -p /opt/blender game/assets/maps build/river_side/source build/river_side/converted
           tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
           /opt/blender/blender --version
