@@ -1,0 +1,143 @@
+name: Deep 3D asset and rig audit
+
+on:
+  push:
+    branches:
+      - reverse-engineering-audit
+    paths:
+      - ".github/workflows/deep-asset-format-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender and extraction tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender unzip
+      - name: Recursively extract model archives
+        shell: bash
+        run: |
+          mkdir -p /tmp/ff_assets
+          python3 - <<'PY'
+          import zipfile, shutil
+          from pathlib import Path
+          root=Path.cwd()
+          out=Path('/tmp/ff_assets')
+          queue=list(root.glob('*.zip'))+list(root.glob('*.usdz'))
+          seen=set()
+          while queue:
+              p=queue.pop(0)
+              if p in seen: continue
+              seen.add(p)
+              try:
+                  with zipfile.ZipFile(p) as z:
+                      target=out/p.stem
+                      target.mkdir(parents=True,exist_ok=True)
+                      z.extractall(target)
+                      queue.extend(x for x in target.rglob('*.zip') if x not in seen)
+              except Exception as e:
+                  print('ARCHIVE_ERROR',p,e)
+          print('ARCHIVES_EXTRACTED',len(seen))
+          print('MODEL_FILES',sum(1 for p in out.rglob('*') if p.suffix.lower() in ('.glb','.gltf','.fbx','.obj','.blend','.usdc','.usd','.usda')))
+          PY
+      - name: Inspect model files with Blender
+        shell: bash
+        run: |
+          cat > /tmp/inspect_assets.py <<'PY'
+          import bpy, json, os, math, traceback
+          from pathlib import Path
+          root=Path('/tmp/ff_assets')
+          results=[]
+          exts={'.glb','.gltf','.fbx','.obj','.blend','.usdc','.usd','.usda'}
+          files=sorted(p for p in root.rglob('*') if p.is_file() and p.suffix.lower() in exts)
+          def reset():
+              bpy.ops.object.select_all(action='SELECT')
+              bpy.ops.object.delete(use_global=False)
+          def bounds_for(objects):
+              pts=[]
+              for o in objects:
+                  if o.type!='MESH': continue
+                  for c in o.bound_box:
+                      pts.append(o.matrix_world @ __import__('mathutils').Vector(c))
+              if not pts: return None
+              return {'min':[min(v[i] for v in pts) for i in range(3)],
+                      'max':[max(v[i] for v in pts) for i in range(3)],
+                      'size':[max(v[i] for v in pts)-min(v[i] for v in pts) for i in range(3)]}
+          for p in files:
+              item={'file':str(p.relative_to(root)),'format':p.suffix.lower(),'bytes':p.stat().st_size}
+              try:
+                  reset()
+                  ext=p.suffix.lower()
+                  if ext in ('.glb','.gltf'):
+                      bpy.ops.import_scene.gltf(filepath=str(p))
+                  elif ext=='.fbx':
+                      bpy.ops.import_scene.fbx(filepath=str(p),use_anim=True)
+                  elif ext=='.obj':
+                      if hasattr(bpy.ops.wm,'obj_import'): bpy.ops.wm.obj_import(filepath=str(p))
+                      else: bpy.ops.import_scene.obj(filepath=str(p))
+                  elif ext=='.blend':
+                      with bpy.data.libraries.load(str(p),link=False) as (src,dst):
+                          dst.objects=src.objects
+                      for o in dst.objects:
+                          if o: bpy.context.scene.collection.objects.link(o)
+                  elif ext in ('.usd','.usda','.usdc'):
+                      bpy.ops.wm.usd_import(filepath=str(p))
+                  objects=list(bpy.context.scene.objects)
+                  meshes=[o for o in objects if o.type=='MESH']
+                  mats={m.name for o in meshes for m in o.data.materials if m}
+                  actions=list(bpy.data.actions)
+                  armatures=[o for o in objects if o.type=='ARMATURE']
+                  item.update({'status':'ok','objects':len(objects),'meshes':len(meshes),
+                    'vertices':sum(len(o.data.vertices) for o in meshes),
+                    'polygons':sum(len(o.data.polygons) for o in meshes),
+                    'materials':sorted(mats),'armatures':len(armatures),
+                    'bones':sum(len(o.data.bones) for o in armatures),
+                    'actions':[a.name for a in actions],
+                    'bounds':bounds_for(meshes)})
+              except Exception as e:
+                  item.update({'status':'error','error':str(e)[:1200],
+                    'traceback':traceback.format_exc()[-2500:]})
+              results.append(item)
+              print('INSPECTED',item['file'],item['status'])
+          Path('/tmp/ff_asset_deep_audit.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
+          print('TOTAL_MODELS',len(results))
+          print('OK',sum(x['status']=='ok' for x in results))
+          print('FAILED',sum(x['status']=='error' for x in results))
+          PY
+          blender -b --factory-startup --python /tmp/inspect_assets.py
+      - name: Create decision summary
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('/tmp/ff_asset_deep_audit.json').read_text())
+          lines=['DEEP 3D ASSET AUDIT - READ ONLY','',
+                 'Files are inspected in isolation. No original project assets are changed.','']
+          for x in data:
+              lines += [f"## {x['file']}",f"Status: {x['status']}"]
+              if x['status']=='ok':
+                  lines += [f"Objects: {x['objects']} | Meshes: {x['meshes']}",
+                    f"Vertices: {x['vertices']} | Polygons: {x['polygons']}",
+                    f"Materials: {len(x['materials'])} | Armatures: {x['armatures']} | Bones: {x['bones']}",
+                    f"Animations: {', '.join(x['actions'][:30]) or 'none'}",
+                    f"Bounds: {x['bounds']}"]
+              else: lines += [f"Error: {x.get('error','unknown')}"]
+              lines.append('')
+          Path('deep-3d-asset-audit-summary.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+      - name: Upload deep asset audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-3d-asset-audit
+          path: |
+            /tmp/ff_asset_deep_audit.json
+            deep-3d-asset-audit-summary.md
+          if-no-files-found: error
+          retention-days: 14
