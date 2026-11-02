@@ -60,7 +60,7 @@ jobs:
             if o is not None:
               bpy.context.scene.collection.objects.link(o)
               if o.type=='MESH':
-                o.location.z-=20.0
+                mw=o.matrix_world.copy(); mw.translation.z-=20.0; o.matrix_world=mw
                 chunk_objs.append(o)
           # Restore Clocktower image references using exact basename or archive-prefixed suffix.
           for im in bpy.data.images:
