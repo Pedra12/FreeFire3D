@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/player_controller.gd" id="1_controller"]
 [ext_resource type="PackedScene" path="res://assets/characters/female_player_rigged.glb" id="2_model"]
 [ext_resource type="Script" path="res://scripts/combat_controller.gd" id="3_combat"]
 [ext_resource type="Script" path="res://scripts/player_health.gd" id="4_health"]
+[ext_resource type="Script" path="res://scripts/weapon_mount.gd" id="5_weapon"]
 
 [sub_resource type="CapsuleShape3D" id="Capsule_player"]
 radius = 0.255
@@ -36,3 +37,6 @@ script = ExtResource("3_combat")
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("4_health")
+
+[node name="WeaponMount" type="Node3D" parent="."]
+script = ExtResource("5_weapon")
