@@ -31,7 +31,8 @@ var medkit_center: Vector2
 var inventory_center: Vector2
 var button_radius: float = 42.0
 var ammo_current: int = 5
-var ammo_reserve: int = 30
+var ammo_reserve: int = 20
+var weapon_label: String = "AWM"
 var health_current: float = 100.0
 var health_maximum: float = 100.0
 var inventory_snapshot: Dictionary = {}
@@ -89,9 +90,10 @@ func is_touch_on_control(pos: Vector2) -> bool:
 		or pos.distance_to(medkit_center) < button_radius * 1.3 \
 		or pos.distance_to(inventory_center) < button_radius * 1.4
 
-func set_ammo(current: int, reserve: int) -> void:
+func set_ammo(current: int, reserve: int, weapon_name: String = "AWM") -> void:
 	ammo_current = current
 	ammo_reserve = reserve
+	weapon_label = weapon_name
 	queue_redraw()
 
 func set_health(current: float, maximum: float) -> void:
@@ -229,7 +231,7 @@ func _draw() -> void:
 	draw_rect(Rect2(28, 75, 180.0 * clampf(health_current / health_maximum, 0.0, 1.0), 10), health_color, true)
 	draw_string(font, Vector2(size.x * 0.5 - 120.0, 38.0), match_status, HORIZONTAL_ALIGNMENT_CENTER, 240.0, 17, Color.WHITE)
 	draw_string(font, Vector2(size.x * 0.5 - 50.0, 62.0), score_text, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 14, Color(1.0, 0.82, 0.34))
-	var ammo_text := "AWM  %02d / %03d" % [ammo_current, ammo_reserve]
+	var ammo_text := "%s  %02d / %03d" % [weapon_label, ammo_current, ammo_reserve]
 	draw_string(font, Vector2(size.x - 195.0, 48.0), ammo_text, HORIZONTAL_ALIGNMENT_RIGHT, 170.0, 19, Color.WHITE)
 	if aiming:
 		var center := size * 0.5
@@ -258,21 +260,24 @@ func _draw() -> void:
 		draw_string(font, Vector2(size.x * 0.5, size.y * 0.5 + 12.0), result_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 42, Color(0.95, 0.82, 0.28))
 
 func _draw_inventory(font: Font) -> void:
-	var panel := Rect2(size.x * 0.5 - 220.0, size.y * 0.5 - 165.0, 440.0, 330.0)
+	var panel := Rect2(size.x * 0.5 - 220.0, size.y * 0.5 - 190.0, 440.0, 380.0)
 	draw_rect(panel, Color(0.015, 0.025, 0.045, 0.94), true)
 	draw_rect(panel, Color(0.38, 0.58, 0.78, 0.95), false, 2.0)
 	draw_string(font, Vector2(panel.position.x + 24.0, panel.position.y + 36.0), "MOCHILA DE COMBATE", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
 	var rows := [
-		"AWM | Munição 7.62: %d" % int(inventory_snapshot.get("ammo_762", ammo_reserve)),
+		"Munição AR 5.56: %d" % int(inventory_snapshot.get("ammo_556", 0)),
+		"Munição SMG / pistola 9mm: %d" % int(inventory_snapshot.get("ammo_9mm", 0)),
+		"Munição calibre 12: %d" % int(inventory_snapshot.get("ammo_12g", 0)),
+		"Munição sniper: %d" % int(inventory_snapshot.get("ammo_sniper", ammo_reserve)),
+		"Munição 7.62: %d" % int(inventory_snapshot.get("ammo_762", 0)),
 		"Kits médicos: %d" % int(inventory_snapshot.get("medkits", 0)),
 		"Granadas: %d" % int(inventory_snapshot.get("grenades", 0)),
-		"Colete: %d%%" % int(inventory_snapshot.get("armor", 0)),
-		"Capacete: %d%%" % int(inventory_snapshot.get("helmet", 0)),
+		"Colete: %d%% | Capacete: %d%%" % [int(inventory_snapshot.get("armor", 0)), int(inventory_snapshot.get("helmet", 0))],
 		"Mochila nível: %d | Capacidade: %d" % [int(inventory_snapshot.get("backpack_level", 1)), int(inventory_snapshot.get("capacity", 12))]
 	]
 	for i in range(rows.size()):
-		draw_string(font, Vector2(panel.position.x + 28.0, panel.position.y + 82.0 + i * 34.0), rows[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.88, 0.92, 0.98))
-	draw_string(font, Vector2(panel.position.x + 24.0, panel.end.y - 22.0), "Toque em MOCHILA para fechar", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.65, 0.75, 0.86))
+		draw_string(font, Vector2(panel.position.x + 28.0, panel.position.y + 70.0 + i * 29.0), rows[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.88, 0.92, 0.98))
+	draw_string(font, Vector2(panel.position.x + 24.0, panel.end.y - 18.0), "Toque em MOCHILA para fechar", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.65, 0.75, 0.86))
 
 func _draw_button(center: Vector2, label: String, active: bool, radius: float = 42.0) -> void:
 	var fill: Color = Color(0.18, 0.62, 0.92, 0.78) if active else Color(0.03, 0.05, 0.08, 0.48)
