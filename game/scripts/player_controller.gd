@@ -39,8 +39,6 @@ func _ready() -> void:
 			hud.grenade_requested.connect(throw_grenade)
 		if hud.has_signal("medkit_requested"):
 			hud.medkit_requested.connect(use_medkit)
-		if hud.has_signal("inventory_requested"):
-			hud.inventory_requested.connect(_toggle_inventory)
 	var animation_nodes := model.find_children("*", "AnimationPlayer", true, false)
 	if not animation_nodes.is_empty():
 		animation_player = animation_nodes[0] as AnimationPlayer
