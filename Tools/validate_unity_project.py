@@ -109,6 +109,8 @@ if olivia_model.exists():
                     "Olivia rig report contains too few humanoid bones.")
             require(report.get("glb_skins") == 1,
                     "Olivia GLB must contain exactly one skin.")
+            require(report.get("glb_mesh_nodes") == report.get("glb_skinned_mesh_nodes"),
+                    "One or more Olivia mesh nodes are not bound to the humanoid skin.")
             require(report.get("glb_meshes") == 7,
                     "Olivia GLB must preserve the seven source meshes.")
             require(report.get("glb_images") == report.get("source_texture_images"),
