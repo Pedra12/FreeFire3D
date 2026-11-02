@@ -14,7 +14,7 @@ signal shot_fired(hit: bool)
 
 @onready var player: CharacterBody3D = get_parent() as CharacterBody3D
 @onready var camera: Camera3D = player.get_node("CameraPivot/Camera3D") as Camera3D
-@onready var hud: Control = player.get_node("../../MobileHUD") as Control
+@onready var hud: Control = player.get_node("../MobileHUD") as Control
 
 var ammo_in_magazine: int = 30
 var reserve_ammo: int = 120
