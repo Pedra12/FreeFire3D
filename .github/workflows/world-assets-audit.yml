@@ -18,10 +18,14 @@ jobs:
       - name: Install Blender and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xz-utils curl libegl1
-          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          sudo apt-get install -y blender xz-utils curl libegl1
           mkdir -p /opt/blender
-          tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          if curl -L --fail --retry 2 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz; then
+            tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          else
+            echo "Official Blender download unavailable; using Ubuntu Blender package"
+            ln -sf "$(command -v blender)" /opt/blender/blender
+          fi
           /opt/blender/blender --version
       - name: Extract map, building and arena source archives
         run: |
