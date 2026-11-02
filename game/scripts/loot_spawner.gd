@@ -27,7 +27,11 @@ func _ready() -> void:
 	call_deferred("_spawn_loot")
 
 func _spawn_loot() -> void:
-	await get_tree().physics_frame
+	var map_node := get_parent().get_node_or_null("Map")
+	var waited := 0
+	while map_node != null and not bool(map_node.get("is_ready_for_queries")) and waited < 600:
+		await get_tree().physics_frame
+		waited += 1
 	var count := mini(max_loot, loot_points.size())
 	var created := 0
 	for i in range(count):
@@ -47,4 +51,4 @@ func _spawn_loot() -> void:
 		add_child(pickup)
 		pickup.global_position = hit.position + Vector3.UP * 0.05
 		created += 1
-	print("LOOT_SPAWNED count=", created, " requested=", count)
+	print("LOOT_SPAWNED count=", created, " requested=", count, " waited_frames=", waited)
