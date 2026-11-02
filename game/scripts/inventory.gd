@@ -6,9 +6,9 @@ signal item_used(item_type: StringName)
 @export var backpack_capacity: int = 12
 var backpack_level: int = 1
 var ammo_762: int = 0
-var ammo_556: int = 120
-var ammo_9mm: int = 90
-var ammo_12g: int = 24
+var ammo_556: int = 60
+var ammo_9mm: int = 45
+var ammo_12g: int = 12
 var ammo_sniper: int = 20
 var medkits: int = 2
 var grenades: int = 1
@@ -120,7 +120,7 @@ func absorb_damage(amount: float) -> float:
 	return remaining
 
 func _ammo_capacity() -> int:
-	return 60 + (backpack_level - 1) * 60
+	return 120 + (backpack_level - 1) * 60
 
 func get_snapshot() -> Dictionary:
 	return {
