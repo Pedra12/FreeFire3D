@@ -19,7 +19,8 @@ namespace FreeFire3D.EditorTools
     public sealed class InitialMatchSceneBuilder : AssetPostprocessor
     {
         private const string MapPath = "Assets/Game/Maps/Clocktower/Clocktower.glb";
-        private const string OliviaPath = "Assets/Game/Characters/Olivia/Olivia.fbx";
+        private const string OliviaPath = "Assets/Game/Characters/Olivia/Olivia.glb";
+        private const string AvatarPath = "Assets/Game/Characters/Olivia/OliviaAvatar.asset";
         private const string ScenePath = "Assets/Scenes/Match.unity";
         private const string MatchConfigPath = "Assets/Game/Match/MatchConfiguration.asset";
         private static bool building;
@@ -33,12 +34,12 @@ namespace FreeFire3D.EditorTools
             if (File.Exists(ScenePath) || building)
                 return;
 
-            if (File.Exists(MapPath) && File.Exists(OliviaPath))
+            if (File.Exists(MapPath) && File.Exists(OliviaPath) && File.Exists(AvatarPath))
                 EditorApplication.delayCall += BuildIfReady;
         }
 
         [MenuItem("FreeFire3D/Build Initial Match Scene")]
-        private static void BuildIfReady()
+        internal static void BuildIfReady()
         {
             if (building || File.Exists(ScenePath))
                 return;
@@ -48,9 +49,7 @@ namespace FreeFire3D.EditorTools
             {
                 GameObject mapAsset = LoadRootAsset(MapPath);
                 GameObject oliviaAsset = LoadRootAsset(OliviaPath);
-                Avatar avatar = AssetDatabase.LoadAllAssetsAtPath(OliviaPath)
-                    .OfType<Avatar>()
-                    .FirstOrDefault(candidate => candidate != null && candidate.isValid && candidate.isHuman);
+                Avatar avatar = AssetDatabase.LoadAssetAtPath<Avatar>(AvatarPath);
 
                 if (mapAsset == null || oliviaAsset == null)
                 {
