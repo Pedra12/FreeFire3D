@@ -43,6 +43,16 @@ func _audit() -> void:
 			print("RIG_HAND_BONE=", bone_name)
 
 	var animation_names := anim_player.get_animation_list()
+	if model.scene_file_path != "res://assets/characters/olivia_rigged.glb":
+		push_error("RIG_AUDIT_FAILED: Olivia is not the selected playable model")
+		quit(1)
+		return
+	for required_clip in [&"Idle_Loop", &"Walk_Loop", &"Sprint_Loop", &"Jump_Start", &"Jump_Loop", &"Pistol_Aim_Neutral", &"Pistol_Shoot", &"Pistol_Reload"]:
+		if not anim_player.has_animation(required_clip):
+			push_error("RIG_AUDIT_FAILED: missing Olivia animation " + String(required_clip))
+			quit(1)
+			return
+	print("OLIVIA_PLAYER_MODEL_OK required_movement_combat_clips=8")
 	print("RIG_ANIMATION_COUNT=", animation_names.size())
 	for animation_name in animation_names:
 		print("RIG_ANIMATION=", animation_name)
