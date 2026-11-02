@@ -65,7 +65,7 @@ jobs:
               raise RuntimeError("Official Blender build lacks USD import support")
           bpy.ops.object.select_all(action="SELECT")
           bpy.ops.object.delete(use_global=False)
-          bpy.ops.wm.usd_import(filepath=source, import_textures_mode="IMPORT")
+          bpy.ops.wm.usd_import(filepath=source, import_textures_mode="IMPORT_PACK")
           meshes=[o for o in bpy.context.scene.objects if o.type=="MESH"]
           if not meshes:
               raise RuntimeError("USD import produced no mesh objects")
