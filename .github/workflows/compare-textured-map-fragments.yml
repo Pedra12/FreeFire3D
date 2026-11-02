@@ -71,12 +71,18 @@ jobs:
             camdata=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',camdata); scene.collection.objects.link(cam)
             cam.location=(center.x,center.y,center.z+span*2.0); cam.rotation_euler=(0,0,0)
             cam.data.type='ORTHO'; cam.data.ortho_scale=span; scene.camera=cam
-            scene.render.engine='BLENDER_WORKBENCH'
-            scene.display.shading.light='STUDIO'
-            scene.display.shading.color_type='MATERIAL'
-            scene.display.shading.show_shadows=True
-            scene.display.shading.show_cavity=True
+            # Render with Eevee so MTL image textures are actually visible.
+            # Ubuntu's apt Blender may be 3.x (BLENDER_EEVEE) or 4.x (EEVEE_NEXT).
+            scene.render.engine='BLENDER_EEVEE_NEXT' if bpy.app.version >= (4,2,0) else 'BLENDER_EEVEE'
             scene.render.resolution_x=1500; scene.render.resolution_y=1200; scene.render.resolution_percentage=100
+            scene.render.image_settings.file_format='PNG'
+            scene.view_settings.view_transform='Standard'
+            if scene.world is None: scene.world=bpy.data.worlds.new('AuditWorld')
+            scene.world.color=(0.18,0.18,0.18)
+            light_data=bpy.data.lights.new('AuditArea','AREA'); light_data.energy=span*span*18
+            light=bpy.data.objects.new('AuditArea',light_data); scene.collection.objects.link(light)
+            light.location=(center.x-span*0.15,center.y+span*0.15,center.z+span*1.5)
+            light.rotation_euler=(0,0,0); light_data.shape='DISK'; light_data.size=span*1.5
             scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(path)
             bpy.ops.render.render(write_still=True)
           # Render complete white-map source as delivered, preserving all original materials.
