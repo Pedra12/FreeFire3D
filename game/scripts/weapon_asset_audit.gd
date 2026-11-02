@@ -9,8 +9,13 @@ func _audit() -> void:
 		push_error("WEAPON_AUDIT: player scene unavailable")
 		quit(1)
 		return
+	var test_root := Node3D.new()
+	root.add_child(test_root)
+	var test_hud := Control.new()
+	test_hud.name = "MobileHUD"
+	test_root.add_child(test_hud)
 	var player := player_scene.instantiate()
-	root.add_child(player)
+	test_root.add_child(player)
 	await process_frame
 	await process_frame
 	var model := player.get_node("VisualRoot/FemalePlayer")
