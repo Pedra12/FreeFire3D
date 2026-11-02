@@ -421,6 +421,8 @@ report = {
     "source_texture_images": len(used_source_images),
     "glb_images": exported_images,
     "glb_meshes": exported_meshes,
+    "glb_mesh_nodes": len(mesh_nodes_info),
+    "glb_skinned_mesh_nodes": sum(1 for node in mesh_nodes_info if node["skin"] is not None),
     "glb_skins": exported_skins,
     "armature_bones": len(reimport_armature.data.bones),
     "bone_weight_counts": bone_weight_counts,
