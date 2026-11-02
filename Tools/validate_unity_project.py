@@ -43,7 +43,7 @@ required_files = [
     "Assets/Scripts/Match/MatchConfiguration.cs",
     "Assets/Scripts/Match/MatchRuntimeSettings.cs",
     "Assets/Scripts/World/ClocktowerCollisionAuthoring.cs",
-    "Assets/Editor/OliviaModelPostprocessor.cs",
+    "Assets/Editor/OliviaAvatarAssetBuilder.cs",
     "Assets/Editor/InitialMatchSceneBuilder.cs",
     "Assets/Documentation/CONTENT_SELECTION.md",
 ]
@@ -90,7 +90,7 @@ if map_model.exists():
         except Exception as exc:
             errors.append(f"Invalid Clocktower AssetImportReport.json: {exc}")
 
-olivia_model = ROOT / "Assets/Game/Characters/Olivia/Olivia.fbx"
+olivia_model = ROOT / "Assets/Game/Characters/Olivia/Olivia.glb"
 olivia_report = ROOT / "Assets/Game/Characters/Olivia/OliviaRigReport.json"
 if olivia_model.exists():
     require(olivia_report.is_file(), "Olivia FBX exists without its rig report.")
@@ -105,6 +105,12 @@ if olivia_model.exists():
                     "Olivia FBX round-trip did not preserve all seven meshes.")
             require(report.get("armature_bones", 0) >= 15,
                     "Olivia rig report contains too few humanoid bones.")
+            require(report.get("glb_skins") == 1,
+                    "Olivia GLB must contain exactly one skin.")
+            require(report.get("glb_meshes") == 7,
+                    "Olivia GLB must preserve the seven source meshes.")
+            require(report.get("glb_images") == report.get("source_texture_images"),
+                    "Olivia GLB does not contain all source texture images.")
         except Exception as exc:
             errors.append(f"Invalid OliviaRigReport.json: {exc}")
 
