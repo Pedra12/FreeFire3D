@@ -15,7 +15,11 @@ func _audit() -> void:
 	await physics_frame
 	var map_node := scene.get_node("Map") as Node3D
 	var player_node := scene.get_node("Player") as Node3D
-	var model_node := player_node.get_node("VisualRoot/FemalePlayer") as Node3D
+	var model_node := player_node.get_node_or_null("VisualRoot/Olivia") as Node3D
+	if model_node == null:
+		push_error("SCALE_AUDIT: Olivia model not found under VisualRoot")
+		quit(3)
+		return
 	var map_bounds := _combined_bounds(map_node)
 	var model_bounds := _combined_bounds(model_node)
 	print("SCALE_AUDIT map_scale=", map_node.scale,
