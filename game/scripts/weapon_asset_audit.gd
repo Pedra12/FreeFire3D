@@ -72,4 +72,5 @@ func _audit() -> void:
 		return
 	print("RIG_AND_WEAPON_INTEGRATION_OK: skeleton=", skeleton.get_bone_count(),
 		" animations=", animation_names.size(), " weapon_meshes=", weapon_meshes.size())
+	print("WEAPON_AUDIT_OK")
 	quit(0)
