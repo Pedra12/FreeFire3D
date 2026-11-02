@@ -14,7 +14,7 @@ OUT = ROOT / "Assets/Game/Animations/Quaternius/FBXInspectionReport.json"
 if not FBX.is_file():
     raise SystemExit(f"Quaternius Unity FBX is missing: {FBX}")
 
-source_report = json.loads(SOURCE_REPORT.read_text(encoding="utf-8"))
+source_report = json.loads(SOURCE_REPORT.read_text(encoding="utf-8").strip())
 actual_hash = hashlib.sha256(FBX.read_bytes()).hexdigest()
 if actual_hash != source_report.get("fbx_sha256"):
     raise SystemExit("Quaternius FBX hash does not match the downloaded source manifest.")
