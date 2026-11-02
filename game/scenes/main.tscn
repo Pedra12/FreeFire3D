@@ -77,7 +77,7 @@ bot_count = 7
 [node name="LootSpawner" type="Node3D" parent="."]
 script = ExtResource("7_loot_spawner")
 loot_scene = ExtResource("8_loot")
-max_loot = 18
+max_loot = 14
 
 [node name="MatchManager" type="Node" parent="."]
 script = ExtResource("9_match_manager")
