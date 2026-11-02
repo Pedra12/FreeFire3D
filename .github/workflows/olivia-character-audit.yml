@@ -16,10 +16,15 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Install Blender for source-model preview
+      - name: Install official Blender 4.5.3 for source-model preview
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender
+          sudo apt-get install -y xz-utils curl
+          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          mkdir -p /opt/blender
+          tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          echo "BLENDER_BIN=/opt/blender/blender" >> "$GITHUB_ENV"
+          "$BLENDER_BIN" --version
       - name: Download Godot 4.7.2
         run: |
           mkdir -p tools/godot
@@ -75,7 +80,7 @@ jobs:
           Path('build/olivia-blender-report.json').write_text(json.dumps(report,indent=2))
           print('OLIVIA_BLENDER_REPORT',json.dumps(report))
           PY
-          blender -b -t 2 --python build/render_olivia.py 2>&1 | tee build/olivia-blender.log
+          "$BLENDER_BIN" -b -t 2 --python build/render_olivia.py 2>&1 | tee build/olivia-blender.log
           grep OLIVIA_BLENDER_REPORT build/olivia-blender.log
       - name: Import model and inspect rig and animations in isolated Godot project
         run: |
