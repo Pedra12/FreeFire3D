@@ -25,12 +25,12 @@ shape = SubResource("Capsule_player")
 scale = Vector3(0.75, 0.75, 0.75)
 
 [node name="CameraPivot" type="Node3D" parent="."]
-position = Vector3(0, 2.4, 0)
+position = Vector3(0, 1.65, 0)
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot"]
-position = Vector3(0, 0, 4.6)
+position = Vector3(0, 0, 3.4)
 current = true
-fov = 72.0
+fov = 65.0
 
 [node name="CombatController" type="Node" parent="."]
 script = ExtResource("3_combat")
