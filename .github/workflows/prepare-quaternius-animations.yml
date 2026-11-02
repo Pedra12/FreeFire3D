@@ -1,0 +1,33 @@
+name: Prepare CC0 humanoid animation library
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "Tools/fetch_quaternius_animations.py"
+      - ".github/workflows/prepare-quaternius-animations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated Unity project
+        uses: actions/checkout@v4
+      - name: Download and validate official Quaternius Standard pack
+        run: python3 Tools/fetch_quaternius_animations.py
+      - name: Commit one in-place animation library
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SourceArchives/quaternius-universal-animation-library-standard.zip Assets/Game/Animations/Quaternius/UAL1_Standard.glb Assets/Game/Animations/Quaternius/AnimationImportReport.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Add canonical CC0 humanoid animation library"
+            git pull --rebase origin unity-project
+            git push origin HEAD:unity-project
+          fi
