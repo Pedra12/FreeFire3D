@@ -4,7 +4,7 @@ using FreeFire3D.CameraSystem;
 
 namespace FreeFire3D.Input
 {
-    public sealed class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler
+    public sealed class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         [SerializeField] private TPSCameraRig cameraRig;
         [SerializeField] private bool ignoreFirstDragDelta = true;
@@ -29,25 +29,10 @@ namespace FreeFire3D.Input
             cameraRig.AddLookDelta(eventData.delta);
         }
 
-        private void Update()
+        public void OnPointerUp(PointerEventData eventData)
         {
-            if (activePointer == int.MinValue) return;
-            if (Input.touchCount == 0)
-            {
+            if (eventData.pointerId == activePointer)
                 activePointer = int.MinValue;
-                return;
-            }
-
-            for (int i = 0; i < Input.touchCount; i++)
-            {
-                Touch touch = Input.GetTouch(i);
-                if (touch.fingerId == activePointer &&
-                    (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled))
-                {
-                    activePointer = int.MinValue;
-                    return;
-                }
-            }
         }
 
         private void OnDisable()
