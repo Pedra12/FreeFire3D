@@ -314,26 +314,42 @@ if deformation < 0.0001:
 
 out_fbx = tmp / "Olivia.fbx"
 scale_factor = 1.78 / height
+# Remove import-only empty nodes so the exporter cannot accidentally include legacy hierarchy.
+for obj in list(bpy.context.scene.objects):
+    if obj.type not in {"MESH", "ARMATURE"}:
+        bpy.data.objects.remove(obj, do_unlink=True)
 bpy.ops.object.select_all(action="DESELECT")
 armature.select_set(True)
 for obj in meshes:
     obj.select_set(True)
 bpy.context.view_layer.objects.active = armature
-bpy.ops.export_scene.fbx(
-    filepath=str(out_fbx),
-    use_selection=True,
-    object_types={"ARMATURE", "MESH"},
-    global_scale=scale_factor,
-    apply_unit_scale=True,
-    use_mesh_modifiers=True,
-    add_leaf_bones=False,
-    use_armature_deform_only=True,
-    bake_anim=False,
-    path_mode="COPY",
-    embed_textures=True,
-    axis_forward="-Z",
-    axis_up="Y",
-)
+
+fbx_operator = bpy.ops.export_scene.fbx
+fbx_properties = {prop.identifier for prop in fbx_operator.get_rna_type().properties}
+print("FBX_EXPORT_PROPERTIES=" + ",".join(sorted(fbx_properties)), flush=True)
+fbx_args = {
+    "filepath": str(out_fbx),
+    "use_selection": True,
+    "object_types": {"ARMATURE", "MESH"},
+    "global_scale": scale_factor,
+    "apply_unit_scale": True,
+    "use_mesh_modifiers": True,
+    "add_leaf_bones": False,
+    "use_armature_deform_only": True,
+    "bake_anim": False,
+    "path_mode": "COPY",
+    "embed_textures": True,
+    "axis_forward": "-Z",
+    "axis_up": "Y",
+}
+if "use_selection" not in fbx_properties:
+    fbx_args.pop("use_selection", None)
+if "object_types" not in fbx_properties:
+    fbx_args.pop("object_types", None)
+fbx_args = {key: value for key, value in fbx_args.items() if key in fbx_properties}
+fbx_operator(**fbx_args)
+if not out_fbx.is_file() or out_fbx.stat().st_size < 1024:
+    raise SystemExit("Blender FBX exporter did not create a usable Olivia file.")
 
 # Round-trip the FBX to verify that the rig and skin weights survive export.
 bpy.ops.wm.read_factory_settings(use_empty=True)
