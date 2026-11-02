@@ -8,7 +8,7 @@ extends Node3D
 	&"right_hand"
 ]
 @export var target_weapon_length: float = 0.82
-@export var hand_offset: Vector3 = Vector3(0.02, -0.035, 0.24)
+@export var hand_offset: Vector3 = Vector3(0.02, -0.22, 0.24)
 @export var hand_rotation_degrees: Vector3 = Vector3(0.0, -90.0, 0.0)
 
 var mounted_weapon: Node3D
