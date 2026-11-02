@@ -25,8 +25,11 @@ jobs:
       - name: Install Blender and archive tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender unzip python3-numpy libegl1 libgl1-mesa-dri
-          blender --version
+          sudo apt-get install -y unzip xz-utils curl libegl1 libgl1-mesa-dri
+          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          mkdir -p /opt/blender
+          tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          /opt/blender/blender --version
       - name: Extract candidate maps and buildings
         run: |
           mkdir -p /tmp/candidates audit/candidates audit/previews audit/logs
@@ -152,7 +155,7 @@ jobs:
           while IFS= read -r -d '' f; do
             export CANDIDATE_FILE="$f"
             base="$(basename "$f")"
-            blender -b --python /tmp/audit_candidate.py > "audit/logs/${base}.log" 2>&1 || echo "FAILED $f" >> audit/logs/failures.txt
+            /opt/blender/blender -b --python /tmp/audit_candidate.py > "audit/logs/${base}.log" 2>&1 || echo "FAILED $f" >> audit/logs/failures.txt
           done
           python3 - <<'PY'
           import json, pathlib
