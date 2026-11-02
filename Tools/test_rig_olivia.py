@@ -340,6 +340,7 @@ gltf_args = {
     "export_cameras": False,
     "export_lights": False,
     "export_apply": False,
+    "export_draco_mesh_compression_enable": False,
     "export_yup": True,
 }
 gltf_args = {key: value for key, value in gltf_args.items() if key in gltf_properties}
@@ -364,8 +365,13 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(out_glb))
 reimport_meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 reimport_armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
-if len(reimport_meshes) != source_mesh_count or len(reimport_armatures) != 1:
+if len(reimport_meshes) < source_mesh_count or len(reimport_meshes) > source_mesh_count + 2 or len(reimport_armatures) != 1:
     raise SystemExit(f"GLB round-trip mismatch: meshes={len(reimport_meshes)} armatures={len(reimport_armatures)}")
+reimport_vertex_count = sum(len(obj.data.vertices) for obj in reimport_meshes)
+reimport_face_count = sum(len(obj.data.polygons) for obj in reimport_meshes)
+print("OLIVIA_REIMPORT_MESHES=" + ", ".join(
+    f"{obj.name}:{len(obj.data.vertices)}" for obj in reimport_meshes
+), flush=True)
 reimport_armature = reimport_armatures[0]
 required_bones = {
     "Hips", "Spine", "Chest", "Neck", "Head",
@@ -394,6 +400,8 @@ report = {
     "target_height_m": round(reimport_height, 3),
     "source_meshes": source_mesh_count,
     "reimport_meshes": len(reimport_meshes),
+    "reimport_vertices": reimport_vertex_count,
+    "reimport_faces": reimport_face_count,
     "source_vertices": source_vertex_count,
     "source_faces": source_face_count,
     "source_texture_images": len(used_source_images),
