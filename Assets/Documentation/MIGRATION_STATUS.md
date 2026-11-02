@@ -7,6 +7,7 @@
 - Initial third-person motor, orbit camera and mobile input components.
 - Mobile crouch changes CharacterController height and checks overhead clearance before standing.
 - Initial 4v4 match configuration.
+- Landscape runtime settings, static map collision authoring and an idempotent initial Match scene builder are prepared.
 - Structural CI checks pass and confirm no Godot scene/script/cache files in the Unity branch.
 - Both original source archives pass ZIP integrity checks.
 - Blender 5.0.1 inspection completed for the selected Olivia GLB and Clocktower FBX.
@@ -21,7 +22,8 @@
 - 7 meshes, 12,079 vertices and 17,719 faces.
 - World bounds are approximately 2.792 m wide, 0.883 m deep and 5.078 m tall. The source needs a deliberate scale correction before gameplay.
 - 0 armatures, 0 skins and 0 animation clips. This source model is **not rigged**.
-- It remains the one canonical Olivia. A humanoid armature, skin weights and deformation tests are required before connecting movement and weapon animations.
+- The one approved output is now `Olivia.glb`, with a generated humanoid skeleton and skin weights. The pipeline must pass a pose-deformation test, skinned-GLB export and re-import validation before it is committed.
+- `OliviaAvatarAssetBuilder.cs` is prepared to build a Unity Humanoid Avatar from the imported skeleton and save `OliviaAvatar.asset`. This Unity Editor step has not yet been executed or validated.
 - Source appears to match Sketchfab “Olivia free fire” by Xman, listed CC BY; confirm the match and preserve attribution before distribution.
 
 ### Clocktower
@@ -35,14 +37,18 @@
 
 ## Not yet completed
 
-- Olivia humanoid rigging and FBX round-trip validation are still being tested. No playable Olivia model has been imported into Unity.
-- No Unity Editor import, C# compile, scene test, Android build or real-device test has been performed.
-- The actual mobile HUD canvas, weapon system, combat, bots, interiors and match scene are not implemented.
+- Olivia rigged GLB generation and round-trip validation.
+- Unity Editor validation of the Olivia Humanoid Avatar.
+- Automatic creation and inspection of `Assets/Scenes/Match.unity`.
+- No Unity Editor C# compile, scene play test, Android build or real-device test has been performed.
+- The actual mobile HUD layout is prepared by the scene builder, but firing, aiming and weapon switching are not connected to a weapon system yet.
+- Weapon models, combat, bots, enterable interiors, bot navigation and match scoring are not implemented.
 - Clocktower collision, enterable interiors, navigation and Android performance still need gameplay validation.
 
 ## Next safe steps
 
-1. Complete and validate a single rigged Olivia FBX with correct scale, skin weights and a working deformation test.
-2. Create one match scene with one Clocktower instance and one Olivia player.
-3. Add collision and test camera, movement and entry into buildings.
-4. Add the mobile HUD, weapons, bots and 4v4 combat only after the vertical slice is stable.
+1. Complete one skinned Olivia GLB and validate its deformation and round-trip.
+2. Let Unity build and validate the single Humanoid Avatar.
+3. Create one Match scene with one Clocktower instance and one Olivia player.
+4. Test movement, camera, map collision and building access.
+5. Add weapons, bots and 4v4 combat only after the vertical slice is stable.
