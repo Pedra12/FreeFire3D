@@ -126,7 +126,7 @@ while offset + 8 <= len(data):
     chunk = data[offset:offset + chunk_size]
     offset += chunk_size
     if chunk_type == 0x4E4F534A:
-        gltf = json.loads(chunk.decode("utf-8").rstrip("\\x00 "))
+        gltf = json.loads(chunk.decode("utf-8").rstrip("\x00 "))
         break
 if gltf is None:
     raise SystemExit("Clocktower GLB JSON chunk is missing.")
@@ -154,6 +154,6 @@ report = {
     "file_size_bytes": len(data),
     "sha256": hashlib.sha256(data).hexdigest(),
 }
-REPORT_FILE.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
+REPORT_FILE.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 print("CLOCKTOWER_EXPORT_OK")
 print(json.dumps(report, indent=2))
