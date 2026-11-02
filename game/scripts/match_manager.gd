@@ -8,6 +8,7 @@ var player_node: Node3D
 var hud: Control
 
 func _ready() -> void:
+	get_tree().node_added.connect(_on_node_added)
 	call_deferred("_connect_match")
 
 func _connect_match() -> void:
@@ -19,10 +20,21 @@ func _connect_match() -> void:
 		if health != null and health.has_signal("eliminated"):
 			health.eliminated.connect(_on_player_eliminated)
 	for bot in get_tree().get_nodes_in_group("bots"):
-		if bot.has_signal("eliminated"):
-			bot.eliminated.connect(_on_bot_eliminated)
+		_connect_bot(bot)
 	_update_hud()
-	print("MATCH_READY mode=4v4 player_team=0 bots=", get_tree().get_nodes_in_group("bots").size())
+	print("MATCH_READY mode=4v4 player_team=0")
+
+func _on_node_added(node: Node) -> void:
+	if node == self:
+		return
+	call_deferred("_connect_bot", node)
+
+func _connect_bot(node: Node) -> void:
+	if not is_instance_valid(node) or not node.is_in_group("bots"):
+		return
+	if node.has_signal("eliminated") and not node.eliminated.is_connected(_on_bot_eliminated):
+		node.eliminated.connect(_on_bot_eliminated)
+	_update_hud()
 
 func _on_player_eliminated(killer_team: int = -1) -> void:
 	if match_over:
@@ -75,7 +87,8 @@ func _update_hud() -> void:
 		var health_value := 0.0
 		if combatant.is_in_group("player"):
 			var health := combatant.get_node_or_null("Health")
-			if health != null: health_value = float(health.get("current_health"))
+			if health != null:
+				health_value = float(health.get("current_health"))
 		else:
 			health_value = float(combatant.get("health"))
 		if health_value > 0.0:
