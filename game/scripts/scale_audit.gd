@@ -23,6 +23,19 @@ func _audit() -> void:
 		" model_size=", model_bounds.size,
 		" player_scale=", player_node.scale,
 		" model_local_scale=", model_node.scale)
+	var entries: Array[Dictionary] = []
+	for child in map_node.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := child as MeshInstance3D
+		if mesh_node == null or mesh_node.mesh == null:
+			continue
+		var bounds: AABB = mesh_node.global_transform * mesh_node.get_aabb()
+		entries.append({"name": str(mesh_node.get_path()), "size": bounds.size, "position": bounds.position})
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a["size"].x * a["size"].y * a["size"].z > b["size"].x * b["size"].y * b["size"].z)
+	print("MAP_MESH_AUDIT count=", entries.size())
+	for i in range(mini(entries.size(), 80)):
+		var item: Dictionary = entries[i]
+		print("MAP_MESH name=", item["name"], " size=", item["size"], " origin=", item["position"])
 	quit()
 
 func _combined_bounds(root_node: Node3D) -> AABB:
