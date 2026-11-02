@@ -170,6 +170,26 @@ jobs:
           PY
           test -s game/assets/weapons/awm_free_fire.glb
 
+      - name: Download CC0 premium weapon models
+        run: |
+          mkdir -p game/assets/weapons
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33318/v1/model.glb -o game/assets/weapons/assault_rifle.glb
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33303/v1/model.glb -o game/assets/weapons/smg.glb
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33311/v1/model.glb -o game/assets/weapons/shotgun.glb
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33296/v1/model.glb -o game/assets/weapons/pistol.glb
+          python3 - <<'PY'
+          import os, hashlib, json
+          root="game/assets/weapons"
+          report={}
+          for name in ["assault_rifle","smg","shotgun","pistol"]:
+              path=os.path.join(root,name+".glb")
+              size=os.path.getsize(path)
+              if size < 100000: raise SystemExit(f"Weapon model too small: {name} {size}")
+              report[name]={"bytes":size,"sha256":hashlib.sha256(open(path,"rb").read()).hexdigest()}
+          with open("build/weapon-models-download.json","w") as f: json.dump(report,f,indent=2)
+          print("CC0_WEAPON_MODELS_OK",json.dumps(report))
+          PY
+
       - name: Download CC0 footsteps audio
         run: |
           mkdir -p game/assets/audio build/audio
