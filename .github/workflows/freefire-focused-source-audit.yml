@@ -1,0 +1,92 @@
+name: Free Fire focused source audit
+
+on:
+  push:
+    branches:
+      - reverse-engineering-audit
+    paths:
+      - ".github/workflows/freefire-focused-source-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract focused Android architecture details
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, json, re, xml.etree.ElementTree as ET
+          from pathlib import Path
+          z=zipfile.ZipFile('com.dts.freefireth.zip')
+          names=z.namelist()
+          focus=['FFMainActivity.java','FFAPI.java','FFAndroidModule.java','FFApplication.java',
+                 'FFNetworkConnectionManager.java','VodkaUnity.java','SdkUnity.java',
+                 'UnityPlayerActivity.java','PlayAssetDeliveryUnityWrapper.java',
+                 'FFFirebaseManager.java','FFVoiceManager.java','FFLocalNotification.java',
+                 'FFBroadcastReceiver.java']
+          result={'focus_sources':[],'manifest':{},'unity_related_files':[]}
+          for name in names:
+            if name.endswith('.java') and any(name.endswith('/'+f) for f in focus):
+              src=z.read(name).decode('utf-8','replace')
+              imports=re.findall(r'(?m)^\s*import\s+[^;]+;',src)
+              methods=re.findall(r'(?m)^\s*(?:public|protected|private)\s+(?:static\s+)?(?:final\s+)?[\w<>?,.\[\] ]+\s+(\w+)\s*\([^;]*\)\s*(?:throws\s+[\w, ]+)?\s*\{',src)
+              result['focus_sources'].append({
+                'path':name,'bytes':len(src.encode()),'imports':imports[:100],
+                'method_names':methods[:200],'source':src[:24000]
+              })
+            if name.endswith('.java') and any(k in name.lower() for k in ('unity','assetpack','assetdelivery','garena/sdkunity')):
+              result['unity_related_files'].append(name)
+            if name.endswith('AndroidManifest.xml'):
+              raw=z.read(name).decode('utf-8','replace')
+              try:
+                root=ET.fromstring(raw)
+                ns='{http://schemas.android.com/apk/res/android}'
+                app=root.find('application')
+                def attr(node,key): return node.attrib.get(ns+key)
+                result['manifest']={
+                  'package':root.attrib.get('package'),
+                  'versionName':attr(root,'versionName'),'versionCode':attr(root,'versionCode'),
+                  'minSdk':attr(root.find('uses-sdk'),'minSdkVersion') if root.find('uses-sdk') is not None else None,
+                  'targetSdk':attr(root.find('uses-sdk'),'targetSdkVersion') if root.find('uses-sdk') is not None else None,
+                  'permissions':[x.attrib.get(ns+'name') for x in root.findall('uses-permission')],
+                  'application':{'name':attr(app,'name'),'isGame':attr(app,'isGame'),'hardwareAccelerated':attr(app,'hardwareAccelerated'),'largeHeap':attr(app,'largeHeap')},
+                  'activities':[{'name':attr(x,'name'),'exported':attr(x,'exported'),'orientation':attr(x,'screenOrientation'),'launchMode':attr(x,'launchMode')} for x in app.findall('activity')],
+                  'services':[{'name':attr(x,'name'),'exported':attr(x,'exported')} for x in app.findall('service')],
+                  'receivers':[{'name':attr(x,'name'),'exported':attr(x,'exported')} for x in app.findall('receiver')],
+                  'metadata':[{'name':attr(x,'name'),'value':attr(x,'value')} for x in app.findall('meta-data')]
+                }
+              except Exception as e:
+                result['manifest']={'parse_error':str(e),'preview':raw[:12000]}
+          result['focus_sources'].sort(key=lambda x:x['path'])
+          result['unity_related_files']=sorted(set(result['unity_related_files']))
+          Path('freefire-focused-source.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          with open('freefire-focused-source-summary.txt','w',encoding='utf-8') as f:
+            f.write('FREE FIRE FOCUSED SOURCE AUDIT - READ ONLY\n\n')
+            f.write('MANIFEST\n'+json.dumps(result['manifest'],ensure_ascii=False,indent=2)+'\n\n')
+            f.write('FOCUSED CLASSES\n')
+            for x in result['focus_sources']:
+              f.write('\n### '+x['path']+' ('+str(x['bytes'])+' bytes)\n')
+              f.write('METHODS: '+', '.join(x['method_names'])+'\n')
+              f.write('IMPORTS: '+', '.join(x['imports'])+'\n')
+              f.write(x['source']+'\n')
+            f.write('\nUNITY RELATED SOURCE FILES\n'+'\n'.join(result['unity_related_files']))
+          print('FOCUS_CLASSES',len(result['focus_sources']))
+          print('ACTIVITIES',len(result.get('manifest',{}).get('activities',[])))
+          print('PERMISSIONS',len(result.get('manifest',{}).get('permissions',[])))
+          print('UNITY_FILES',len(result['unity_related_files']))
+          PY
+      - name: Upload focused source report
+        uses: actions/upload-artifact@v4
+        with:
+          name: freefire-focused-source-audit
+          path: |
+            freefire-focused-source.json
+            freefire-focused-source-summary.txt
+          if-no-files-found: error
+          retention-days: 7
