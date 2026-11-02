@@ -395,18 +395,24 @@ required_bones = {
 missing_bones = required_bones - {bone.name for bone in reimport_armature.data.bones}
 if missing_bones:
     raise SystemExit("GLB lost humanoid bones: " + ", ".join(sorted(missing_bones)))
+expected_mesh_node_names = {node["name"] for node in mesh_nodes_info}
+validated_reimport_meshes = [
+    obj for obj in reimport_meshes if obj.name in expected_mesh_node_names
+]
+unexpected_reimport_meshes = [
+    obj.name for obj in reimport_meshes if obj.name not in expected_mesh_node_names
+]
+if {obj.name for obj in validated_reimport_meshes} != expected_mesh_node_names:
+    raise SystemExit("Blender GLB round-trip did not restore every exported mesh node.")
 skinned_reimport_meshes = [
-    obj for obj in reimport_meshes
+    obj for obj in validated_reimport_meshes
     if any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
 ]
-if len(skinned_reimport_meshes) < source_mesh_count:
-    raise SystemExit(
-        f"Too few re-imported mesh objects retained armature modifiers: "
-        f"{len(skinned_reimport_meshes)} < {source_mesh_count}"
-    )
-for obj in reimport_meshes:
+if len(skinned_reimport_meshes) != len(expected_mesh_node_names):
+    raise SystemExit("One or more exported Olivia mesh nodes lost their armature modifier.")
+for obj in validated_reimport_meshes:
     if weighted_vertex_count(obj) != len(obj.data.vertices):
-        raise SystemExit(f"GLB mesh has unweighted vertices: {obj.name}")
+        raise SystemExit(f"Exported GLB mesh has unweighted vertices: {obj.name}")
 
 reimport_points = [o.matrix_world @ Vector(corner) for o in reimport_meshes for corner in o.bound_box]
 reimport_height = max(p.z for p in reimport_points) - min(p.z for p in reimport_points)
@@ -422,6 +428,8 @@ report = {
     "source_meshes": source_mesh_count,
     "reimport_meshes": len(reimport_meshes),
     "reimport_skinned_meshes": len(skinned_reimport_meshes),
+    "reimport_validated_meshes": len(validated_reimport_meshes),
+    "reimport_helper_meshes_ignored": unexpected_reimport_meshes,
     "reimport_vertices": reimport_vertex_count,
     "reimport_faces": reimport_face_count,
     "source_vertices": source_vertex_count,
