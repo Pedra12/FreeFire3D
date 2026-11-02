@@ -33,7 +33,7 @@ while offset + 8 <= len(raw_glb):
     chunk = raw_glb[offset:offset + chunk_size]
     offset += chunk_size
     if chunk_type == 0x4E4F534A:
-        gltf_json = json.loads(chunk.decode("utf-8").rstrip("\\x00 "))
+        gltf_json = json.loads(chunk.decode("utf-8").rstrip("\x00 "))
     elif chunk_type == 0x004E4942:
         binary_chunk = chunk
 if gltf_json is None:
@@ -61,7 +61,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images), flush=True)
 for image in bpy.data.images:
-    match = re.search(r"Image[_ ]?(\\d+)", image.name)
+    match = re.search(r"Image[_ ]?(\d+)", image.name)
     if not match:
         continue
     index = int(match.group(1))
