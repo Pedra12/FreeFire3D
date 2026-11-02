@@ -6,14 +6,14 @@ This branch is a standalone Unity project. Godot scenes, scripts, imported resou
 
 | Slot | One approved asset | Source archive in repository | Import destination |
 |---|---|---|---|
-| Player character | Olivia, rigged humanoid | `olivia-free-fire.zip` | `Assets/Game/Characters/Olivia/` |
-| Match map | Clocktower | `free-fire-clocktower-3d-model-by-rs-ratul.zip` | `Assets/Game/Maps/Clocktower/` |
+| Player character | Olivia, rigged humanoid | `SourceArchives/olivia-free-fire.zip` | `Assets/Game/Characters/Olivia/` |
+| Match map | Clocktower | `SourceArchives/free-fire-clocktower-3d-model-by-rs-ratul.zip` | `Assets/Game/Maps/Clocktower/` |
 
 These are the only selected character and map for the first playable vertical slice. Do not import the other character bundles or map archives as alternate versions.
 
 ## Import gate
 
-The two selected source archives are stored at the repository root, outside the Unity `Assets/` folder. They must be inspected before extraction. Confirm:
+The two selected source archives are stored in `SourceArchives/`, outside the Unity `Assets/` folder. They must be inspected before extraction. Confirm:
 - exact model file and texture dependencies;
 - skeleton hierarchy, mesh weights and animation clips for Olivia;
 - map coordinate orientation, scale, material references and collision suitability;
@@ -29,7 +29,7 @@ If an approved asset is replaced, remove the old asset from its canonical destin
 
 - This branch's working tree: Unity project only, plus the two approved source archives and CI workflow.
 - Legacy Godot project: preserved on branch `4v4-premium-prototype`.
-- Root-level ZIP archives: original source archives, not runtime content.
+- `SourceArchives/`: the two original source archives, not runtime content.
 - Never reference a `res://` Godot path from Unity.
 - Never place Godot scenes, scripts, `.import` files or `.godot` cache in this branch.
 

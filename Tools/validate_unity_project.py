@@ -48,7 +48,7 @@ for relative in required_files:
 legacy_suffixes = {".gd", ".tscn", ".godot", ".import"}
 legacy_files = [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
                 if p.is_file() and p.suffix.lower() in legacy_suffixes]
-require(not legacy_files, "Godot files found inside UnityProject: " + ", ".join(legacy_files))
+require(not legacy_files, "Godot files found in the Unity project tree: " + ", ".join(legacy_files))
 
 content_doc = (ROOT / "Assets/Documentation/CONTENT_SELECTION.md").read_text(encoding="utf-8")
 require(content_doc.count("Olivia, rigged humanoid") == 1,
@@ -57,8 +57,8 @@ require(content_doc.count("Clocktower") >= 1,
         "Content manifest must identify the one approved match map.")
 
 expected_archives = [
-    REPO / "olivia-free-fire.zip",
-    REPO / "free-fire-clocktower-3d-model-by-rs-ratul.zip",
+    REPO / "SourceArchives" / "olivia-free-fire.zip",
+    REPO / "SourceArchives" / "free-fire-clocktower-3d-model-by-rs-ratul.zip",
 ]
 for archive in expected_archives:
     require(archive.is_file(), f"Approved source archive missing: {archive.name}")
