@@ -21,22 +21,22 @@ var camera_touch_id: int = -1
 var mouse_look: bool = false
 var jump_was_down: bool = false
 var current_animation: StringName = &""
+var action_animation_locked: bool = false
 
 func _ready() -> void:
 	add_to_group("player")
-	animation_player = model.find_child("*", true, false) as AnimationPlayer
-	if animation_player == null:
-		for child in model.get_children():
-			if child is AnimationPlayer:
-				animation_player = child
-				break
+	var animation_nodes := model.find_children("*", "AnimationPlayer", true, false)
+	if not animation_nodes.is_empty():
+		animation_player = animation_nodes[0] as AnimationPlayer
+	if animation_player != null:
+		animation_player.animation_finished.connect(_on_animation_finished)
 	camera.current = true
 	camera_pivot.position = Vector3(0.0, camera_height, 0.0)
 	camera.position = Vector3(0.0, 0.0, camera_distance)
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	await _find_ground_and_place()
-	_play_first_available([&"Idle", &"idle", &"Idle_Rifle"])
+	_play_first_available([&"Idle_Rifle", &"Idle", &"idle"])
 
 func _find_ground_and_place() -> void:
 	await get_tree().physics_frame
@@ -88,8 +88,8 @@ func _physics_process(delta: float) -> void:
 	var aiming: bool = false
 	var jump_now: bool = false
 	if is_instance_valid(hud):
-		aiming = bool(hud.get("aiming"))
-		jump_now = bool(hud.get("jump_pressed"))
+		aiming = hud.get("aiming") == true
+		jump_now = hud.get("jump_pressed") == true
 	var sprinting: bool = move_input.length() > 0.72 and not aiming
 	var target_speed: float = sprint_speed if sprinting else walk_speed
 
@@ -111,27 +111,39 @@ func _physics_process(delta: float) -> void:
 	jump_was_down = jump_now
 	move_and_slide()
 
+	if not action_animation_locked:
 	if not is_on_floor():
-		if velocity.y < -0.5:
-			_play_first_available([&"Jump_Land", &"Land", &"Fall"])
-		elif velocity.y > 0.2:
-			_play_first_available([&"Jump", &"Jump_Loop", &"Fall"])
-	elif direction.length() > 0.08:
-		if sprinting:
-			_play_first_available([&"Sprint", &"Run", &"Run_F"])
+			if velocity.y < -0.5:
+				_play_first_available([&"Jump_Land", &"Land", &"Fall"])
+			elif velocity.y > 0.2:
+				_play_first_available([&"Jump", &"Jump_Loop", &"Fall"])
+		elif direction.length() > 0.08:
+			if sprinting:
+				_play_first_available([&"Sprint", &"Run", &"Run_F"])
+			else:
+				_play_first_available([&"Walk", &"Walk_F", &"Walk_Forward"])
 		else:
-			_play_first_available([&"Walk", &"Walk_F", &"Walk_Forward"])
-	else:
-		if aiming:
-			_play_first_available([&"Pistol_Aim_Neutral", &"Rifle_Aim_Idle", &"Idle"])
-		else:
-			_play_first_available([&"Idle", &"idle", &"Idle_Rifle"])
-
+			if aiming:
+				_play_first_available([&"Pistol_Aim_Neutral", &"Rifle_Aim_Idle", &"Idle"])
+			else:
+				_play_first_available([&"Idle", &"idle", &"Idle_Rifle"])
+	
 	camera_pivot.global_position = camera_pivot.global_position.lerp(global_position + Vector3.UP * camera_height, 1.0 - exp(-10.0 * delta))
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	camera.position = camera.position.lerp(Vector3(0.0, 0.0, camera_distance), 1.0 - exp(-8.0 * delta))
 	camera.look_at(camera_pivot.global_position + (-camera_pivot.global_transform.basis.z * 5.0), Vector3.UP)
+
+func play_action_animation(animation_name: StringName) -> void:
+	if animation_player == null or not animation_player.has_animation(animation_name):
+		return
+	action_animation_locked = true
+	current_animation = animation_name
+	animation_player.play(animation_name, 0.06)
+
+func _on_animation_finished(animation_name: StringName) -> void:
+	if action_animation_locked and animation_name == current_animation:
+		action_animation_locked = false
 
 func _play_first_available(names: Array[StringName]) -> void:
 	if animation_player == null:
