@@ -16,7 +16,7 @@
 - **Canonical Olivia GLB generated and committed** at `Assets/Game/Characters/Olivia/Olivia.glb`.
 - Olivia Blender rig pipeline passed pose-deformation and GLB round-trip tests: 7 skinned mesh nodes, 1 skin, 22 bones and 10 embedded textures. The final model is 2,687,664 bytes and its corrected height is 1.78 m.
 - **Quaternius Universal Animation Library Standard downloaded and verified**. The source archive is CC0 1.0; its checksum is recorded in `AnimationImportReport.json`. The selected Unity FBX is 23,754,684 bytes and uses the in-place, no-root-motion variant. Its paired GLB manifest confirms 43 clips on a 65-joint humanoid rig.
-- `QuaterniusAnimationImporter.cs` configures Unity's native FBX importer for Humanoid animations and disables mesh import so the donor rig cannot become a second playable character.
+- `QuaterniusAnimationImporter.cs` configures Unity's native FBX importer for Humanoid animations and strips the donor's renderer components so it cannot become a second visible or playable character.
 - `QuaterniusAnimationImporter.cs` builds a generated Olivia Animator Controller with locomotion, crouch and jump states once Unity imports the clips.
 
 ## Source asset inspection findings
