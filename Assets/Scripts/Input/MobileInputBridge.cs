@@ -59,6 +59,7 @@ namespace FreeFire3D.Input
 
         public void Crouch()
         {
+            player?.ToggleCrouch();
             crouchPressed?.Invoke();
         }
 
