@@ -18,7 +18,11 @@ jobs:
       - name: Install Blender and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender libegl1 python3-numpy
+          sudo apt-get install -y xz-utils curl libegl1
+          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          mkdir -p /opt/blender
+          tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          /opt/blender/blender --version
       - name: Extract map, building and arena source archives
         run: |
           mkdir -p audit/world_candidates
@@ -139,9 +143,6 @@ jobs:
                       scene.display.shading.show_shadows=True
                       scene.display.shading.show_cavity=True
                       scene.display.shading.background_type="WORLD"
-                      scene.display.shading.show_floor=False
-                      scene.display.shading.show_axis_x=False
-                      scene.display.shading.show_axis_y=False
                       scene.render.resolution_x=1200
                       scene.render.resolution_y=900
                       scene.render.resolution_percentage=100
@@ -162,7 +163,7 @@ jobs:
                   results.append(report)
           Path("audit/world_candidates/world-candidates-summary.json").write_text(json.dumps(results,indent=2),encoding="utf8")
           PY
-          blender -b -t 2 --python audit/inspect_world_candidates.py 2>&1 | tee audit/world_candidates/blender-audit.log
+          /opt/blender/blender -b -t 2 --python-exit-code 1 --python audit/inspect_world_candidates.py 2>&1 | tee audit/world_candidates/blender-audit.log
       - name: Upload world candidate audit
         if: always()
         uses: actions/upload-artifact@v4
