@@ -99,6 +99,54 @@ jobs:
           print('BERMUDA_REPORT '+json.dumps({k:report.get(k) for k in ['mesh_count','vertex_count','triangle_count','material_count','texture_nodes','texture_nodes_loaded','texture_nodes_missing','bounds','dimensions','preview','preview_error']}))
           PY
           blender -b --python /tmp/inspect_bermuda.py 2>&1 | tee audit/blender-inspection.log
+      - name: Test import and scene loading in Godot 4.7.2 (temporary project only)
+        run: |
+          mkdir -p /tmp/godot-map-test
+          curl -L --fail --retry 3 "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip" -o /tmp/godot-map-test/godot.zip
+          unzip -q /tmp/godot-map-test/godot.zip -d /tmp/godot-map-test
+          GODOT_BIN="$(find /tmp/godot-map-test -type f -name 'Godot_v4.7.2-stable_linux.x86_64' | head -n 1)"
+          test -n "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          cp /tmp/bermuda/map.glb /tmp/godot-map-test/bermuda.glb
+          cat > /tmp/godot-map-test/project.godot <<'EOF'
+          config_version=5
+          [application]
+          config/name="Bermuda GLB Read Only Audit"
+          run/main_scene="res://main.tscn"
+          [rendering]
+          renderer/rendering_method="gl_compatibility"
+          renderer/rendering_method.mobile="gl_compatibility"
+          EOF
+          cat > /tmp/godot-map-test/main.gd <<'EOF'
+          extends Node3D
+          func _ready():
+              var meshes = find_children("*", "MeshInstance3D", true, false)
+              var surfaces = 0
+              var vertices = 0
+              var materials = 0
+              for item in meshes:
+                  if item.mesh:
+                      surfaces += item.mesh.get_surface_count()
+                      for surface in range(item.mesh.get_surface_count()):
+                          var arrays = item.mesh.surface_get_arrays(surface)
+                          if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
+                              vertices += arrays[Mesh.ARRAY_VERTEX].size()
+                          if item.mesh.surface_get_material(surface) != null:
+                              materials += 1
+              print("BERMUDA_GODOT_AUDIT meshes=", meshes.size(), " surfaces=", surfaces, " vertices=", vertices, " material_surfaces=", materials)
+              get_tree().quit()
+          EOF
+          cat > /tmp/godot-map-test/main.tscn <<'EOF'
+          [gd_scene load_steps=3 format=3]
+          [ext_resource type="PackedScene" path="res://bermuda.glb" id="1_map"]
+          [ext_resource type="Script" path="res://main.gd" id="2_script"]
+          [node name="Audit" type="Node3D"]
+          script = ExtResource("2_script")
+          [node name="Bermuda" parent="." instance=ExtResource("1_map")]
+          EOF
+          "$GODOT_BIN" --headless --editor --path /tmp/godot-map-test --quit 2>&1 | tee audit/godot-import.log
+          "$GODOT_BIN" --headless --path /tmp/godot-map-test --quit-after 5 2>&1 | tee audit/godot-scene-test.log
+          grep "BERMUDA_GODOT_AUDIT" audit/godot-scene-test.log
       - name: Upload read-only audit and preview
         if: always()
         uses: actions/upload-artifact@v4
