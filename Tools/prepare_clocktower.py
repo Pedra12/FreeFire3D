@@ -18,9 +18,20 @@ REPORT_FILE = OUT_DIR / "AssetImportReport.json"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 if OUT_FILE.exists():
-    raise SystemExit("Refusing to create a second Clocktower model: canonical GLB already exists.")
+    old_report = {}
+    if REPORT_FILE.exists():
+        try:
+            old_report = json.loads(REPORT_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    if old_report.get("asset") == "Clocktower" and old_report.get("source", "").startswith("RS RATUL"):
+        OUT_FILE.unlink()
+        REPORT_FILE.unlink(missing_ok=True)
+    else:
+        raise SystemExit("Refusing to overwrite an unrecognized Clocktower model.")
 other_models = [p for p in OUT_DIR.rglob("*") if p.is_file()
-                and p.suffix.lower() in {".glb", ".gltf", ".fbx", ".obj", ".blend", ".dae"}]
+                and p.suffix.lower() in {".glb", ".gltf", ".fbx", ".obj", ".blend", ".dae"}
+                and p != OUT_FILE]
 if other_models:
     raise SystemExit("Refusing to mix map versions: " + ", ".join(str(p) for p in other_models))
 
@@ -78,6 +89,22 @@ for image in bpy.data.images:
 if missing:
     raise SystemExit("Clocktower has unresolved textures: " + ", ".join(sorted(set(missing))))
 
+used_images = set()
+for material in bpy.data.materials:
+    if not material.use_nodes or material.node_tree is None:
+        continue
+    for node in material.node_tree.nodes:
+        if node.type == "TEX_IMAGE" and node.image and any(
+            link.from_node == node for link in material.node_tree.links
+        ):
+            used_images.add(node.image)
+for image in used_images:
+    if image.source == "FILE" and image.has_data:
+        image.pack()
+print(f"UNIQUE_USED_TEXTURE_IMAGES={len(used_images)}", flush=True)
+for image in sorted(used_images, key=lambda x: x.name):
+    print(f"  PACKED_TEXTURE={image.name} size={tuple(image.size)} has_data={image.has_data}", flush=True)
+
 meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 if len(meshes) != 38:
     raise SystemExit(f"Unexpected Clocktower mesh count: {len(meshes)} (expected 38)")
@@ -100,8 +127,11 @@ for obj in bpy.context.scene.objects:
         matrix.translation += offset
         obj.matrix_world = matrix
 
+temp_glb = Path(tempfile.gettempdir()) / "Clocktower_validated.glb"
+if temp_glb.exists():
+    temp_glb.unlink()
 bpy.ops.export_scene.gltf(
-    filepath=str(OUT_FILE),
+    filepath=str(temp_glb),
     export_format="GLB",
     export_image_format="AUTO",
     export_materials="EXPORT",
@@ -112,7 +142,7 @@ bpy.ops.export_scene.gltf(
     export_lights=False,
 )
 
-data = OUT_FILE.read_bytes()
+data = temp_glb.read_bytes()
 if data[:4] != b"glTF":
     raise SystemExit("Blender did not produce a valid GLB file.")
 version, declared_length = struct.unpack_from("<II", data, 4)
@@ -130,6 +160,13 @@ while offset + 8 <= len(data):
         break
 if gltf is None:
     raise SystemExit("Clocktower GLB JSON chunk is missing.")
+exported_images = len(gltf.get("images", []))
+if exported_images != len(used_images):
+    raise SystemExit(
+        f"Texture export mismatch: {len(used_images)} used source images, "
+        f"but GLB contains {exported_images} images."
+    )
+temp_glb.replace(OUT_FILE)
 
 report = {
     "asset": "Clocktower",
@@ -149,7 +186,8 @@ report = {
     "texture_references_missing": 0,
     "glb_meshes": len(gltf.get("meshes", [])),
     "glb_materials": len(gltf.get("materials", [])),
-    "glb_images": len(gltf.get("images", [])),
+    "glb_images": exported_images,
+    "used_source_texture_images": len(used_images),
     "glb_nodes": len(gltf.get("nodes", [])),
     "file_size_bytes": len(data),
     "sha256": hashlib.sha256(data).hexdigest(),
