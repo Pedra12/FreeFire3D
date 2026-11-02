@@ -12,17 +12,36 @@ permissions:
 jobs:
   compare:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Install Blender and archive tools
         run: sudo apt-get update && sudo apt-get install -y blender unzip
-      - name: Extract source models
+      - name: Recursively extract source models
         run: |
           mkdir -p /tmp/compare/full /tmp/compare/fragment audit
-          unzip -q free-fire-ful-map.zip -d /tmp/compare/full
-          unzip -q free-fire-burmuda-map-the-circuit-3d-model.zip -d /tmp/compare/fragment
-          find /tmp/compare -type f \( -name '*.blend' -o -name '*.obj' -o -name '*.mtl' -o -name '*.png' \) | head -100
+          python3 - <<'PY'
+          import zipfile,io,pathlib
+          def extract(raw,dest,depth=0):
+            if depth>5: return
+            with zipfile.ZipFile(io.BytesIO(raw)) as z:
+              for info in z.infolist():
+                if info.is_dir(): continue
+                data=z.read(info)
+                name=pathlib.Path(info.filename)
+                if name.suffix.lower()=='.zip':
+                  extract(data,dest/(name.stem),depth+1)
+                else:
+                  out=dest/name
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  out.write_bytes(data)
+          extract(pathlib.Path('free-fire-ful-map.zip').read_bytes(),pathlib.Path('/tmp/compare/full'))
+          extract(pathlib.Path('free-fire-burmuda-map-the-circuit-3d-model.zip').read_bytes(),pathlib.Path('/tmp/compare/fragment'))
+          PY
+          echo "OBJ files:"; find /tmp/compare/fragment -type f -iname '*.obj'
+          echo "MTL files:"; find /tmp/compare/fragment -type f -iname '*.mtl'
+          echo "Textures:"; find /tmp/compare/fragment -type f -iname '*.png' | wc -l
+          test -n "$(find /tmp/compare/fragment -type f -iname '*.obj' -print -quit)"
       - name: Compare geometry, bounds and render previews
         run: |
           cat > /tmp/compare.py <<'PY'
@@ -30,8 +49,10 @@ jobs:
           from mathutils import Vector
           root=pathlib.Path('/tmp/compare')
           blend=next((root/'full').rglob('*.blend'))
-          obj=next((root/'fragment').rglob('*.obj'))
-          mtl=next((root/'fragment').rglob('*.mtl'),None)
+          objs=list((root/'fragment').rglob('*.obj'))
+          obj=max(objs,key=lambda p:p.stat().st_size)
+          mtls=list((root/'fragment').rglob('*.mtl'))
+          mtl=next((p for p in mtls if p.stem==obj.stem),mtls[0] if mtls else None)
           bpy.ops.wm.open_mainfile(filepath=str(blend))
           full=[o for o in bpy.context.scene.objects if o.type=='MESH']
           def bounds(objects):
@@ -46,16 +67,12 @@ jobs:
           frag=[o for o in bpy.context.scene.objects if o.type=='MESH' and o not in full]
           mb=bounds(frag)
           def dims(b): return [round(b['max'][i]-b['min'][i],3) for i in range(3)]
-          report={'full_map_file':str(blend),'fragment_obj':str(obj),'fragment_mtl':str(mtl) if mtl else None,'full_meshes':len(full),'fragment_meshes':len(frag),'full_bounds':fb,'fragment_bounds':mb,'full_dimensions':dims(fb),'fragment_dimensions':dims(mb),'same_coordinate_overlap':None}
+          report={'full_map_file':str(blend),'fragment_obj':str(obj),'fragment_mtl':str(mtl) if mtl else None,'obj_candidates':[(str(p),p.stat().st_size) for p in objs],'full_meshes':len(full),'fragment_meshes':len(frag),'full_bounds':fb,'fragment_bounds':mb,'full_dimensions':dims(fb),'fragment_dimensions':dims(mb),'same_coordinate_overlap':None,'texture_count':len(list((root/'fragment').rglob('*.png')))}
           if fb and mb:
-            overlap=[]
-            for i in range(3):
-              overlap.append(max(0,min(fb['max'][i],mb['max'][i])-max(fb['min'][i],mb['min'][i])))
-            report['same_coordinate_overlap']=overlap
+            report['same_coordinate_overlap']=[round(max(0,min(fb['max'][i],mb['max'][i])-max(fb['min'][i],mb['min'][i])),3) for i in range(3)]
             report['fragment_center']=[round((mb['min'][i]+mb['max'][i])/2,3) for i in range(3)]
             report['full_center']=[round((fb['min'][i]+fb['max'][i])/2,3) for i in range(3)]
           pathlib.Path('audit/geometry-comparison.json').write_text(json.dumps(report,indent=2))
-          # Top-view geometry-only render: assign distinct flat materials to distinguish both assets.
           for o in full:
             mat=bpy.data.materials.new('FullMapNeutral'); mat.diffuse_color=(0.62,0.66,0.68,1); o.data.materials.clear(); o.data.materials.append(mat)
           for o in frag:
@@ -63,31 +80,21 @@ jobs:
           scene=bpy.context.scene
           scene.render.engine='BLENDER_EEVEE_NEXT'
           scene.render.resolution_x=1400; scene.render.resolution_y=1100; scene.render.resolution_percentage=100
-          scene.world.color=(0.06,0.06,0.06)
-          # top view centered on combined bounds
-          allb=[fb,mb]
-          mn=[min(b['min'][i] for b in allb) for i in range(3)]
-          mx=[max(b['max'][i] for b in allb) for i in range(3)]
+          allb=[fb,mb]; mn=[min(b['min'][i] for b in allb) for i in range(3)]; mx=[max(b['max'][i] for b in allb) for i in range(3)]
           center=Vector([(mn[i]+mx[i])/2 for i in range(3)])
           span=max(mx[0]-mn[0],mx[1]-mn[1])*1.15
           camdata=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',camdata); scene.collection.objects.link(cam)
-          cam.location=(center.x,center.y,mx[2]+max(100,span)); cam.rotation_euler=(0,0,0)
-          # camera looks down local -Z, up local Y
-          cam.rotation_euler=(0,0,0); cam.data.type='ORTHO'; cam.data.ortho_scale=span; scene.camera=cam
-          # Hide lights from prior scene and use emission material for reliable flat color
+          cam.location=(center.x,center.y,mx[2]+max(100,span)); cam.rotation_euler=(0,0,0); cam.data.type='ORTHO'; cam.data.ortho_scale=span; scene.camera=cam
           for o in scene.objects:
             if o.type=='LIGHT': o.hide_render=True
           bpy.ops.object.light_add(type='AREA', location=(center.x,center.y,mx[2]+span))
           light=bpy.context.object; light.data.energy=5000; light.data.shape='DISK'; light.data.size=span
-          # add text labels via report only; render top and side
           scene.render.image_settings.file_format='PNG'
-          scene.camera.data.lens=50
           scene.render.filepath='audit/fragment-overlay-top.png'
           bpy.ops.render.render(write_still=True)
-          cam.location=(center.x, mn[1]-span*1.8, center.z); cam.rotation_euler=(math.radians(90),0,0)
+          cam.location=(center.x,mn[1]-span*1.8,center.z); cam.rotation_euler=(math.radians(90),0,0)
           cam.data.ortho_scale=max(mx[0]-mn[0],mx[2]-mn[2])*1.25
-          scene.render.resolution_y=900
-          scene.render.filepath='audit/fragment-overlay-side.png'
+          scene.render.resolution_y=900; scene.render.filepath='audit/fragment-overlay-side.png'
           bpy.ops.render.render(write_still=True)
           print(json.dumps(report,indent=2))
           PY
@@ -98,5 +105,5 @@ jobs:
         with:
           name: FreeFire3D-textured-map-fragment-comparison
           path: audit/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
