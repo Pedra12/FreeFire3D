@@ -175,7 +175,6 @@ hip_x, knee_x, ankle_x = 0.22, 0.22, 0.20
 arm_data = bpy.data.armatures.new("Olivia_Humanoid_Armature")
 armature = bpy.data.objects.new("Olivia_Humanoid_Armature", arm_data)
 bpy.context.scene.collection.objects.link(armature)
-armature.matrix_world.identity()
 bpy.context.view_layer.objects.active = armature
 armature.select_set(True)
 bpy.ops.object.mode_set(mode="EDIT")
