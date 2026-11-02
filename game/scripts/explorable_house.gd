@@ -63,7 +63,7 @@ func _build_house() -> void:
 			Vector3(1.18, 0.16, 0.34), stair_material)
 
 	# Landing and simple door frames make the entrance legible in third person.
-	_add_box("UpperLanding", Vector3(3.15, 3.04, -1.72), Vector3(1.5, 0.12, 1.0), floor_material, true)
+	_add_box("UpperLanding", Vector3(3.15, 3.04, -2.65), Vector3(1.5, 0.12, 1.0), floor_material, true)
 	_add_visual_box("DoorFrameLeft", Vector3(-0.92, 1.12, -4.30), Vector3(0.12, 2.24, 0.12), stair_material)
 	_add_visual_box("DoorFrameRight", Vector3(0.92, 1.12, -4.30), Vector3(0.12, 2.24, 0.12), stair_material)
 
