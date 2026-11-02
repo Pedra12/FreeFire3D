@@ -1,4 +1,4 @@
-name: Prepare canonical Olivia humanoid asset
+name: Prepare canonical Olivia skinned GLB
 
 on:
   push:
@@ -24,15 +24,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y blender python3-numpy python3-pil
-      - name: Generate rigged FBX and validate its round-trip
+      - name: Generate rigged GLB and validate its round-trip
         run: blender --background --python Tools/test_rig_olivia.py -- "$GITHUB_WORKSPACE"
       - name: Commit the single canonical Olivia model
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Assets/Game/Characters/Olivia/Olivia.fbx Assets/Game/Characters/Olivia/OliviaRigReport.json
+          git add Assets/Game/Characters/Olivia/Olivia.glb Assets/Game/Characters/Olivia/OliviaRigReport.json
           if ! git diff --cached --quiet; then
-            git commit -m "Import single rigged Olivia Humanoid model"
+            git commit -m "Import single rigged Olivia Humanoid GLB"
             git pull --rebase origin unity-project
             git push origin HEAD:unity-project
           fi
