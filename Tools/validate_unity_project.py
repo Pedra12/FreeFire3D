@@ -57,7 +57,7 @@ legacy_files = [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
 require(not legacy_files, "Godot files found in the Unity project tree: " + ", ".join(legacy_files))
 
 content_doc = (ROOT / "Assets/Documentation/CONTENT_SELECTION.md").read_text(encoding="utf-8")
-require(content_doc.count("Olivia, rigged humanoid") == 1,
+require(content_doc.count("Olivia, one rigged humanoid") == 1,
         "Content manifest must select exactly one player character.")
 require(content_doc.count("Clocktower") >= 1,
         "Content manifest must identify the one approved match map.")
@@ -65,6 +65,7 @@ require(content_doc.count("Clocktower") >= 1,
 expected_archives = [
     REPO / "SourceArchives" / "olivia-free-fire.zip",
     REPO / "SourceArchives" / "free-fire-clocktower-3d-model-by-rs-ratul.zip",
+    REPO / "SourceArchives" / "quaternius-universal-animation-library-standard.zip",
 ]
 for archive in expected_archives:
     require(archive.is_file(), f"Approved source archive missing: {archive.name}")
@@ -94,7 +95,7 @@ if map_model.exists():
 olivia_model = ROOT / "Assets/Game/Characters/Olivia/Olivia.glb"
 olivia_report = ROOT / "Assets/Game/Characters/Olivia/OliviaRigReport.json"
 if olivia_model.exists():
-    require(olivia_report.is_file(), "Olivia FBX exists without its rig report.")
+    require(olivia_report.is_file(), "Olivia GLB exists without its rig report.")
     if olivia_report.is_file():
         try:
             report = json.loads(olivia_report.read_text(encoding="utf-8"))
@@ -123,6 +124,32 @@ if olivia_model.exists():
         except Exception as exc:
             errors.append(f"Invalid OliviaRigReport.json: {exc}")
 
+animation_model = ROOT / "Assets/Game/Animations/Quaternius/UAL1_Standard.fbx"
+animation_report = ROOT / "Assets/Game/Animations/Quaternius/AnimationImportReport.json"
+animation_folder = ROOT / "Assets/Game/Animations/Quaternius"
+animation_models = [p for p in animation_folder.rglob("*") if p.is_file()
+                    and p.suffix.lower() in {".glb", ".gltf", ".fbx", ".obj", ".blend"}]
+require(animation_models == [animation_model],
+        "Quaternius must have exactly one selected Unity FBX animation source.")
+require(animation_report.is_file(), "Quaternius animation FBX is missing its import report.")
+if animation_report.is_file():
+    try:
+        report = json.loads(animation_report.read_text(encoding="utf-8"))
+        require(report.get("selected_variant") == "Unity/UAL1_Standard.fbx",
+                "Quaternius animation source must be the Unity FBX export.")
+        require(report.get("root_motion") is False,
+                "Quaternius animation source must use the in-place, no-root-motion variant.")
+        require(report.get("animation_count", 0) >= 20,
+                "Quaternius animation manifest contains too few clips.")
+        require(report.get("reference_joint_count", 0) >= 20,
+                "Quaternius reference skeleton contains too few joints.")
+        require(report.get("license") == "CC0 1.0 Universal",
+                "Quaternius animation license metadata is missing or unexpected.")
+        require(len(report.get("fbx_sha256", "")) == 64,
+                "Quaternius FBX SHA-256 is missing.")
+    except Exception as exc:
+        errors.append(f"Invalid Quaternius AnimationImportReport.json: {exc}")
+
 if errors:
     print("UNITY_STRUCTURE_CHECK_FAILED")
     for error in errors:
@@ -133,4 +160,4 @@ print("UNITY_STRUCTURE_CHECK_OK")
 print("Unity project is isolated from Godot files.")
 print("One canonical player slot: Olivia.")
 print("One canonical map slot: Clocktower.")
-print("Source archives exist; model rigging and map import remain separate validation gates.")
+print("Three approved source archives and the canonical animation source are present.")
