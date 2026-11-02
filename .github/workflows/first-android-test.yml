@@ -192,6 +192,12 @@ jobs:
           PY
           test -s game/assets/audio/footstep00.ogg
 
+      - name: Download 2K CC0 PBR materials from Poly Haven
+        run: |
+          python3 tools/download_polyhaven_pbr.py 2>&1 | tee build/polyhaven-pbr-download.log
+          grep "POLYHAVEN_PBR_OK" build/polyhaven-pbr-download.log
+          test -s game/assets/textures/pbr/manifest.json
+
       - name: Rig original Olivia model to the existing 86-clip humanoid skeleton
         run: |
           mkdir -p game/assets/characters build/olivia
