@@ -21,6 +21,7 @@ try:
         "com.unity.render-pipelines.universal",
         "com.unity.inputsystem",
         "com.unity.ugui",
+        "com.unity.cloud.gltfast",
     ):
         require(package in deps, f"Missing required package: {package}")
 except Exception as exc:
@@ -81,4 +82,4 @@ print("UNITY_STRUCTURE_CHECK_OK")
 print("Unity project is isolated from Godot files.")
 print("One canonical player slot: Olivia.")
 print("One canonical map slot: Clocktower.")
-print("Source archives exist; binary asset import remains a separate inspection gate.")
+print("Source archives exist; model rigging and map import remain separate validation gates.")
