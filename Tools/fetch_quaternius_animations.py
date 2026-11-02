@@ -142,6 +142,6 @@ report = {
     "reference_joint_count": len(bone_names),
     "reference_joint_names": bone_names,
 }
-REPORT.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
+REPORT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 print("QUATERNIUS_ANIMATION_IMPORT_OK")
 print(json.dumps(report, indent=2))
