@@ -1,15 +1,9 @@
 from __future__ import annotations
 
 import hashlib
-import glob
 import json
-import sys
 from pathlib import Path
 
-for package_path in glob.glob("/usr/lib/python*/dist-packages") + glob.glob("/usr/local/lib/python*/site-packages"):
-    if package_path not in sys.path:
-        sys.path.append(package_path)
-import numpy  # Required by Blender 5 FBX importer
 import bpy
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +20,7 @@ if actual_hash != source_report.get("fbx_sha256"):
     raise SystemExit("Quaternius FBX hash does not match the downloaded source manifest.")
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-fbx_importer = bpy.ops.import_scene.fbx
+fbx_importer = bpy.ops.wm.fbx_import
 fbx_import_properties = {
     prop.identifier for prop in fbx_importer.get_rna_type().properties
 }
