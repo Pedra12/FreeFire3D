@@ -86,24 +86,13 @@ for index, image in enumerate(gltf_json.get("images", [])):
     try:
         with Image.open(source_path) as source_image:
             source_image.load()
-            rgba = source_image.convert("RGBA").transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+            rgba = source_image.convert("RGBA")
             width, height = rgba.size
-            pixels = np.asarray(rgba, dtype=np.float32) / 255.0
+            normalized_path = image_dir / f"Image_{index}_normalized.png"
+            rgba.save(normalized_path, format="PNG", optimize=True)
     except Exception as exc:
         raise SystemExit(f"Could not decode embedded Olivia image {index} ({mime}): {exc}")
-    image_data = bpy.data.images.new(
-        name=f"OliviaTexture_{index}", width=width, height=height, alpha=True, float_buffer=False
-    )
-    image_data.pixels.foreach_set(pixels.reshape(-1))
-    image_data.update()
-    normalized_path = image_dir / f"Image_{index}_normalized.png"
-    image_data.filepath_raw = str(normalized_path)
-    image_data.file_format = "PNG"
-    image_data.save()
-    image_data.pack()
-    if not image_data.has_data:
-        raise SystemExit(f"Could not create Blender pixel data for Olivia image {index}")
-    extracted_images[index] = image_data
+    extracted_images[index] = normalized_path
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
@@ -111,18 +100,24 @@ print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images)
 
 # Recreate image datablocks from the decoded embedded images and remap material nodes by GLB image index.
 loaded_images_by_index = {}
-for index, image_data in extracted_images.items():
-    pixels = np.asarray(image_data.pixels[:], dtype=np.float32)
+for index, path in extracted_images.items():
+    with Image.open(path) as source_image:
+        source_image.load()
+        rgba = source_image.convert("RGBA").transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        width, height = rgba.size
+        pixels = np.asarray(rgba, dtype=np.float32) / 255.0
     loaded = bpy.data.images.new(
-        name=f"OliviaTexture_{index}", width=image_data.size[0],
-        height=image_data.size[1], alpha=True, float_buffer=False
+        name=f"OliviaTexture_{index}", width=width,
+        height=height, alpha=True, float_buffer=False
     )
-    loaded.pixels.foreach_set(pixels)
+    loaded.pixels.foreach_set(pixels.reshape(-1))
     loaded.update()
-    loaded.filepath_raw = image_data.filepath_raw
+    loaded.filepath_raw = str(path)
     loaded.file_format = "PNG"
     loaded.save()
     loaded.pack()
+    if not loaded.has_data:
+        raise SystemExit(f"Could not create Blender texture data for Olivia image {index}")
     loaded_images_by_index[index] = loaded
 
 for material in bpy.data.materials:
