@@ -143,6 +143,16 @@ jobs:
               scene.render.filepath = str(preview.resolve())
               bpy.ops.render.render(write_still=True)
               result["preview"] = str(preview)
+              if source.stem.lower() == "untitled":
+                for obj in meshes:
+                  if obj.name.lower() in ("metal_04", "others_cloth"):
+                    obj.hide_render = True
+                cam.location = center + Vector((0.0, -0.2, 1.0)).normalized()*span*2.0
+                cam.rotation_euler = (center-cam.location).to_track_quat("-Z","Y").to_euler()
+                cutaway = Path("audit/previews") / (source.stem[:100] + "-roof-hidden.png")
+                scene.render.filepath = str(cutaway.resolve())
+                bpy.ops.render.render(write_still=True)
+                result["roof_hidden_preview"] = str(cutaway)
             out = Path("audit/candidates") / (source.stem[:120] + ".json")
             out.write_text(json.dumps(result, indent=2), encoding="utf8")
             print("CANDIDATE_AUDIT_OK", json.dumps({k:result.get(k) for k in ("source","mesh_count","scene_bounds","preview")}))
