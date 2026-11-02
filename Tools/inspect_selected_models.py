@@ -66,6 +66,13 @@ def inspect_scene(label):
     print("MATERIALS:", flush=True)
     for m in bpy.data.materials:
         print(f"  {m.name}", flush=True)
+        if m.use_nodes and m.node_tree:
+            for node in m.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image:
+                    targets = [link.to_node.name + "." + link.to_socket.name
+                               for link in m.node_tree.links if link.from_node == node]
+                    print(f"    IMAGE_NODE={node.image.name} linked={bool(targets)} "
+                          f"targets={','.join(targets)}", flush=True)
 
 # Olivia: one GLB only, textures are embedded in GLB and in source zip as copies.
 with zipfile.ZipFile(olivia_zip) as outer:
