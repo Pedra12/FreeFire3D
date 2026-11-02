@@ -3,36 +3,95 @@ extends Node
 signal ammo_changed(current: int, reserve: int)
 signal shot_fired(hit: bool)
 
-@export var damage: float = 68.0
-@export var headshot_damage: float = 120.0
-@export var fire_interval: float = 0.92
+@export var damage: float = 80.0
+@export var headshot_damage: float = 150.0
+@export var fire_interval: float = 1.0
 @export var magazine_size: int = 5
-@export var starting_reserve: int = 30
+@export var starting_reserve: int = 20
 @export var reload_duration: float = 2.35
 @export var max_distance: float = 220.0
-@export var aim_fov: float = 48.0
+@export var aim_fov: float = 42.0
 @export var normal_fov: float = 65.0
+
+const WEAPON_CONFIGS := {
+	&"awm": {
+		"name": "AWM", "ammo": &"ammo_sniper", "magazine": 5,
+		"damage": 80.0, "headshot": 150.0, "interval": 1.0,
+		"reload": 2.5, "range": 220.0, "aim_fov": 42.0,
+		"pellets": 1, "spread": 0.0
+	},
+	&"assault_rifle": {
+		"name": "RIFLE", "ammo": &"ammo_556", "magazine": 30,
+		"damage": 28.0, "headshot": 52.0, "interval": 0.105,
+		"reload": 2.0, "range": 160.0, "aim_fov": 50.0,
+		"pellets": 1, "spread": 0.004
+	},
+	&"smg": {
+		"name": "SMG", "ammo": &"ammo_9mm", "magazine": 32,
+		"damage": 20.0, "headshot": 38.0, "interval": 0.075,
+		"reload": 1.65, "range": 85.0, "aim_fov": 52.0,
+		"pellets": 1, "spread": 0.012
+	},
+	&"shotgun": {
+		"name": "12G", "ammo": &"ammo_12g", "magazine": 6,
+		"damage": 9.0, "headshot": 12.0, "interval": 0.82,
+		"reload": 2.4, "range": 38.0, "aim_fov": 52.0,
+		"pellets": 8, "spread": 0.055
+	},
+	&"pistol": {
+		"name": "PISTOLA", "ammo": &"ammo_9mm", "magazine": 12,
+		"damage": 24.0, "headshot": 44.0, "interval": 0.23,
+		"reload": 1.45, "range": 75.0, "aim_fov": 54.0,
+		"pellets": 1, "spread": 0.008
+	}
+}
 
 @onready var player: CharacterBody3D = get_parent() as CharacterBody3D
 @onready var camera: Camera3D = player.get_node("CameraPivot/Camera3D") as Camera3D
 @onready var hud: Control = player.get_node("../MobileHUD") as Control
 @onready var inventory: Node = player.get_node_or_null("Inventory")
 
+var current_weapon_id: StringName = &"awm"
+var current_weapon_name: String = "AWM"
+var current_ammo_type: StringName = &"ammo_sniper"
+var pellets_per_shot: int = 1
+var spread_amount: float = 0.0
 var ammo_in_magazine: int = 5
-var reserve_ammo: int = 30
+var reserve_ammo: int = 20
 var fire_cooldown: float = 0.0
 var reloading: bool = false
 
 func _ready() -> void:
-	ammo_in_magazine = magazine_size
-	if inventory != null:
-		reserve_ammo = int(inventory.get("ammo_762"))
+	equip_weapon(&"awm")
 	if is_instance_valid(hud):
 		if hud.has_signal("reload_requested"):
 			hud.reload_requested.connect(reload)
-		if hud.has_method("set_ammo"):
-			hud.set_ammo(ammo_in_magazine, reserve_ammo)
 	camera.fov = normal_fov
+
+func equip_weapon(weapon_id: StringName) -> bool:
+	if not WEAPON_CONFIGS.has(weapon_id):
+		push_warning("COMBAT: weapon configuration missing: " + String(weapon_id))
+		return false
+	var config: Dictionary = WEAPON_CONFIGS[weapon_id]
+	current_weapon_id = weapon_id
+	current_weapon_name = String(config["name"])
+	current_ammo_type = config["ammo"]
+	magazine_size = int(config["magazine"])
+	damage = float(config["damage"])
+	headshot_damage = float(config["headshot"])
+	fire_interval = float(config["interval"])
+	reload_duration = float(config["reload"])
+	max_distance = float(config["range"])
+	aim_fov = float(config["aim_fov"])
+	pellets_per_shot = int(config["pellets"])
+	spread_amount = float(config["spread"])
+	ammo_in_magazine = magazine_size
+	reserve_ammo = int(inventory.call("get_ammo", current_ammo_type)) if inventory != null else 0
+	reloading = false
+	fire_cooldown = 0.0
+	_emit_ammo()
+	print("WEAPON_EQUIPPED id=", current_weapon_id, " ammo=", current_ammo_type, " magazine=", magazine_size)
+	return true
 
 func _physics_process(delta: float) -> void:
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
@@ -60,9 +119,9 @@ func reload() -> void:
 	var needed := magazine_size - ammo_in_magazine
 	var loaded := needed
 	if inventory != null:
-		loaded = int(inventory.call("consume_ammo", needed))
+		loaded = int(inventory.call("consume_ammo", needed, current_ammo_type))
 	ammo_in_magazine += loaded
-	reserve_ammo = int(inventory.get("ammo_762")) if inventory != null else maxi(0, reserve_ammo - loaded)
+	reserve_ammo = int(inventory.call("get_ammo", current_ammo_type)) if inventory != null else maxi(0, reserve_ammo - loaded)
 	reloading = false
 	_emit_ammo()
 
@@ -72,20 +131,36 @@ func _fire_once() -> void:
 	if player.has_method("play_action_animation"):
 		player.play_action_animation(&"Pistol_Shoot")
 	_emit_ammo()
+
 	var viewport_size := camera.get_viewport().get_visible_rect().size
 	var screen_center := viewport_size * 0.5
 	var origin := camera.project_ray_origin(screen_center)
-	var direction := camera.project_ray_normal(screen_center)
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * max_distance)
-	query.exclude = [player.get_rid()]
-	query.collide_with_areas = false
-	var hit := player.get_world_3d().direct_space_state.intersect_ray(query)
+	var base_direction := camera.project_ray_normal(screen_center)
 	var confirmed_hit := false
 	var eliminated := false
 	var headshot := false
-	var hit_position := origin + direction * 65.0
-	if not hit.is_empty():
-		hit_position = hit.position
+	var hit_position := origin + base_direction * max_distance
+	var nearest_distance := max_distance
+
+	for pellet_index in range(pellets_per_shot):
+		var direction := base_direction
+		if spread_amount > 0.0:
+			direction = (base_direction + Vector3(
+				randf_range(-spread_amount, spread_amount),
+				randf_range(-spread_amount, spread_amount),
+				randf_range(-spread_amount, spread_amount)
+			)).normalized()
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * max_distance)
+		query.exclude = [player.get_rid()]
+		query.collide_with_areas = false
+		var hit := player.get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty():
+			continue
+		var candidate_position: Vector3 = hit.position
+		var distance_to_hit := origin.distance_to(candidate_position)
+		if distance_to_hit < nearest_distance:
+			nearest_distance = distance_to_hit
+			hit_position = candidate_position
 		var collider: Object = hit.get("collider")
 		var damage_target: Object = collider
 		if collider is Node and not collider.is_in_group("damageable"):
@@ -94,14 +169,14 @@ func _fire_once() -> void:
 				damage_target = parent
 		if damage_target is Node and damage_target.is_in_group("damageable") and damage_target.has_method("apply_damage"):
 			var target_node := damage_target as Node3D
-			headshot = hit_position.y >= target_node.global_position.y + 1.35
-			var applied_damage := headshot_damage if headshot else damage
-			var damage_result: Variant = damage_target.call("apply_damage", applied_damage, hit_position, hit.normal, player)
-			eliminated = damage_result == true
+			var is_headshot := candidate_position.y >= target_node.global_position.y + 1.35
+			var applied_damage := headshot_damage if is_headshot else damage
+			var damage_result: Variant = damage_target.call("apply_damage", applied_damage, candidate_position, hit.normal, player)
 			confirmed_hit = true
-		_show_tracer(origin, hit_position)
-	else:
-		_show_tracer(origin, hit_position)
+			headshot = headshot or is_headshot
+			eliminated = eliminated or damage_result == true
+
+	_show_tracer(origin, hit_position)
 	if is_instance_valid(hud):
 		hud.call("show_hitmarker", confirmed_hit, eliminated, headshot)
 	shot_fired.emit(confirmed_hit)
@@ -129,4 +204,4 @@ func _show_tracer(start: Vector3, finish: Vector3) -> void:
 func _emit_ammo() -> void:
 	ammo_changed.emit(ammo_in_magazine, reserve_ammo)
 	if is_instance_valid(hud) and hud.has_method("set_ammo"):
-		hud.set_ammo(ammo_in_magazine, reserve_ammo)
+		hud.call("set_ammo", ammo_in_magazine, reserve_ammo, current_weapon_name)
