@@ -96,7 +96,8 @@ func _fire_once() -> void:
 			var target_node := damage_target as Node3D
 			headshot = hit_position.y >= target_node.global_position.y + 1.35
 			var applied_damage := headshot_damage if headshot else damage
-			eliminated = bool(damage_target.call("apply_damage", applied_damage, hit_position, hit.normal, player))
+			var damage_result: Variant = damage_target.call("apply_damage", applied_damage, hit_position, hit.normal, player)
+			eliminated = damage_result == true
 			confirmed_hit = true
 		_show_tracer(origin, hit_position)
 	else:
