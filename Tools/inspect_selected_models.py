@@ -80,4 +80,36 @@ if hasattr(bpy.ops.wm, "fbx_import"):
     bpy.ops.wm.fbx_import(filepath=str(fbx_path), use_anim=False)
 else:
     bpy.ops.import_scene.fbx(filepath=str(fbx_path), use_image_search=True, use_anim=False)
-inspect_scene("CLOCKTOWER FBX")
+
+texture_root = fbx_path.parent.parent / "textures"
+missing_textures = []
+relinked_textures = []
+for image in bpy.data.images:
+    if image.source != "FILE":
+        continue
+    requested = Path(image.filepath.replace(chr(92), "/")).name
+    exact = texture_root / requested
+    candidate = exact if exact.is_file() else None
+    if candidate is None:
+        stem = Path(requested).stem.lower()
+        matches = [p for p in texture_root.iterdir() if p.is_file()
+                   and (p.stem.lower().startswith(stem) or stem.startswith(p.stem.lower()))]
+        if len(matches) == 1:
+            candidate = matches[0]
+    if candidate is None:
+        missing_textures.append(requested)
+        continue
+    image.filepath = str(candidate)
+    try:
+        image.reload()
+    except Exception:
+        pass
+    relinked_textures.append(candidate.name)
+
+print(f"TEXTURES_RELINKED={len(relinked_textures)}", flush=True)
+for name in sorted(set(relinked_textures)):
+    print(f"  LINKED_TEXTURE={name}", flush=True)
+print(f"TEXTURES_MISSING={len(missing_textures)}", flush=True)
+for name in sorted(set(missing_textures)):
+    print(f"  MISSING_TEXTURE={name}", flush=True)
+inspect_scene("CLOCKTOWER FBX WITH RE-LINKED TEXTURES")
