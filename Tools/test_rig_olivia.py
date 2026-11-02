@@ -29,6 +29,11 @@ maxs = [max(p[i] for p in points) for i in range(3)]
 height = maxs[2] - mins[2]
 if not 4.5 <= height <= 5.6:
     raise SystemExit(f"Unexpected Olivia source height: {height}")
+for image in bpy.data.images:
+    if not image.has_data or image.size[0] <= 0 or image.size[1] <= 0:
+        raise SystemExit(f"Olivia source texture has no pixels: {image.name}")
+    image.pack()
+print(f"OLIVIA_SOURCE_TEXTURES={len(bpy.data.images)}", flush=True)
 center_x = (mins[0] + maxs[0]) * 0.5
 center_y = (mins[1] + maxs[1]) * 0.5
 z0 = mins[2]
