@@ -60,33 +60,63 @@ jobs:
           EOF
           "$GODOT_BIN" --version
 
-      - name: Extract Bermuda Masterizado as the primary complete map
+      - name: Convert complete River Side USDZ map with official Blender
         run: |
-          mkdir -p game/assets/maps build
+          sudo apt-get update
+          sudo apt-get install -y xz-utils unzip curl
+          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          mkdir -p /opt/blender game/assets/maps build/river_side/source build/river_side/converted
+          tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          /opt/blender/blender --version
           python3 - <<'PY'
-          import zipfile, pathlib, hashlib, json
-          archive=pathlib.Path("bermuda-remastered-free-fire.zip")
-          target=pathlib.Path("game/assets/maps/bermuda_masterizado.glb")
+          import zipfile, pathlib, json
+          archive=pathlib.Path("River_Side_3D_Model_Free_Fire.usdz")
+          root=pathlib.Path("build/river_side/source")
           with zipfile.ZipFile(archive) as z:
-              matches=[n for n in z.namelist() if n.endswith("free_fire_full_bermuda_remastered.glb")]
-              if len(matches)!=1:
-                  raise SystemExit(f"Expected exactly one Bermuda GLB, found: {matches}")
-              data=z.read(matches[0])
-              if len(data)<1_000_000:
-                  raise SystemExit(f"Bermuda GLB unexpectedly small: {len(data)} bytes")
-              target.write_bytes(data)
-              texture_entries=[n for n in z.namelist() if n.lower().endswith(".png")]
-              if len(texture_entries)!=2:
-                  raise SystemExit(f"Expected 2 embedded texture files, found {texture_entries}")
-          report={"source_archive":str(archive),"source_glb_entry":matches[0],
-                  "target":str(target),"glb_bytes":len(data),
-                  "glb_sha256":hashlib.sha256(data).hexdigest(),
-                  "embedded_textures":texture_entries}
-          pathlib.Path("build/bermuda-primary-map-report.json").write_text(json.dumps(report,indent=2))
-          print(json.dumps(report,indent=2))
+              entries=z.namelist()
+              usdc=[n for n in entries if n.lower().endswith(".usdc")]
+              textures=[n for n in entries if n.lower().endswith((".png",".jpg",".jpeg"))]
+              if len(usdc)!=1: raise SystemExit(f"Expected one USD scene, found {usdc}")
+              for name in entries:
+                  if name.endswith("/"): continue
+                  target=root/name
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  target.write_bytes(z.read(name))
+          pathlib.Path("build/river_side/source-report.json").write_text(json.dumps(
+              {"usd_scene":usdc[0],"texture_count":len(textures),"archive_entries":len(entries)},indent=2))
+          print("RIVER_SIDE_SOURCE textures=",len(textures),"entries=",len(entries))
           PY
-          test -s game/assets/maps/bermuda_masterizado.glb
-          ls -lh game/assets/maps/bermuda_masterizado.glb
+          cat > build/river_side/convert_usd.py <<'PY'
+          import bpy, os, json
+          source=os.environ["USD_FILE"]
+          output=os.environ["GLB_FILE"]
+          bpy.ops.object.select_all(action="SELECT")
+          bpy.ops.object.delete(use_global=False)
+          bpy.ops.wm.usd_import(filepath=source, import_textures_mode="IMPORT_PACK")
+          meshes=[o for o in bpy.context.scene.objects if o.type=="MESH"]
+          if len(meshes)<400: raise RuntimeError(f"River Side mesh count too low: {len(meshes)}")
+          bpy.ops.object.select_all(action="DESELECT")
+          for obj in meshes: obj.select_set(True)
+          bpy.context.view_layer.objects.active=meshes[0]
+          bpy.ops.export_scene.gltf(filepath=output,export_format="GLB",use_selection=True,
+              export_apply=True,export_texcoords=True,export_normals=True,
+              export_materials="EXPORT",export_cameras=False,export_lights=False)
+          report={"objects":len(meshes),"vertices":sum(len(o.data.vertices) for o in meshes),
+              "polygons":sum(len(o.data.polygons) for o in meshes),
+              "materials":len({m.name for o in meshes for m in o.data.materials if m}),
+              "output_bytes":os.path.getsize(output)}
+          with open(output+".json","w") as f: json.dump(report,f,indent=2)
+          print("RIVER_SIDE_GLB_CONVERTED",json.dumps(report))
+          PY
+          export USD_FILE="$(find build/river_side/source -maxdepth 2 -name '*.usdc' | head -n 1)"
+          export GLB_FILE="$PWD/build/river_side/converted/river_side.glb"
+          test -n "$USD_FILE"
+          /opt/blender/blender -b -t 2 --python build/river_side/convert_usd.py 2>&1 | tee build/river_side/blender-conversion.log
+          grep RIVER_SIDE_GLB_CONVERTED build/river_side/blender-conversion.log
+          test -s "$GLB_FILE"
+          cp "$GLB_FILE" game/assets/maps/river_side.glb
+          test "$(stat -c%s game/assets/maps/river_side.glb)" -gt 10000000
+          ls -lh game/assets/maps/river_side.glb
 
       - name: Build rigged player with 86 animation clips
         run: |
