@@ -142,8 +142,8 @@ jobs:
               row = {"bundle": bundle, "metadata_candidates": metadata, "success": False}
               for meta in metadata:
                   try:
-                      key_sig = ast.literal_eval(sig["key_sig"])
-                      data_sig = ast.literal_eval(sig["data_sig"])
+                      key_sig = ast.literal_eval(sig["key_sig"].replace("\\\\", "\\"))
+                      data_sig = ast.literal_eval(sig["data_sig"].replace("\\\\", "\\"))
                       key = brute_force_key(meta, key_sig, data_sig, pattern)
                       row["key_found"] = True
                       row["key_hex"] = key.hex() if isinstance(key, bytes) else str(key)
