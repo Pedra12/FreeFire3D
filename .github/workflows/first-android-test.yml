@@ -1,4 +1,4 @@
-name: FreeFire3D Android player prototype
+name: FreeFire3D Bermuda Survival Android
 
 on:
   push:
@@ -163,7 +163,7 @@ jobs:
       - name: Export Android APK
         run: |
           mkdir -p build
-          "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-Player-Prototype.apk" 2>&1 | tee build/android-export.log
+          "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-Bermuda-Survival.apk" 2>&1 | tee build/android-export.log
           test -s build/FreeFire3D-Player-Prototype.apk
           unzip -t build/FreeFire3D-Player-Prototype.apk
           "$ANDROID_HOME/build-tools/36.1.0/aapt" dump badging build/FreeFire3D-Player-Prototype.apk | tee build/apk-badging.txt
@@ -174,7 +174,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: FreeFire3D-Player-Prototype-APK
+          name: FreeFire3D-Bermuda-Survival-APK
           path: build/
           if-no-files-found: warn
           retention-days: 14
