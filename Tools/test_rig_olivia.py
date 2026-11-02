@@ -395,9 +395,16 @@ required_bones = {
 missing_bones = required_bones - {bone.name for bone in reimport_armature.data.bones}
 if missing_bones:
     raise SystemExit("GLB lost humanoid bones: " + ", ".join(sorted(missing_bones)))
+skinned_reimport_meshes = [
+    obj for obj in reimport_meshes
+    if any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
+]
+if len(skinned_reimport_meshes) < source_mesh_count:
+    raise SystemExit(
+        f"Too few re-imported mesh objects retained armature modifiers: "
+        f"{len(skinned_reimport_meshes)} < {source_mesh_count}"
+    )
 for obj in reimport_meshes:
-    if not any(modifier.type == "ARMATURE" for modifier in obj.modifiers):
-        raise SystemExit(f"GLB mesh lost armature modifier: {obj.name}")
     if weighted_vertex_count(obj) != len(obj.data.vertices):
         raise SystemExit(f"GLB mesh has unweighted vertices: {obj.name}")
 
@@ -414,6 +421,7 @@ report = {
     "target_height_m": round(reimport_height, 3),
     "source_meshes": source_mesh_count,
     "reimport_meshes": len(reimport_meshes),
+    "reimport_skinned_meshes": len(skinned_reimport_meshes),
     "reimport_vertices": reimport_vertex_count,
     "reimport_faces": reimport_face_count,
     "source_vertices": source_vertex_count,
