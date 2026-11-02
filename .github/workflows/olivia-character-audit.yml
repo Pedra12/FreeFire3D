@@ -19,7 +19,7 @@ jobs:
       - name: Install official Blender 4.5.3 for source-model preview
         run: |
           sudo apt-get update
-          sudo apt-get install -y xz-utils curl
+          sudo apt-get install -y xz-utils curl libegl1 libgl1
           curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
           mkdir -p /opt/blender
           tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
