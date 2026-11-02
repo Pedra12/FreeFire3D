@@ -1,0 +1,22 @@
+name: Unity project structure checks
+
+on:
+  push:
+    branches:
+      - unity-migration
+    paths:
+      - "UnityProject/**"
+      - ".github/workflows/unity-project-structure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+      - name: Validate isolated Unity project
+        run: python3 UnityProject/Tools/validate_unity_project.py
