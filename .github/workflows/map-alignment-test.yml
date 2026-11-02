@@ -54,14 +54,15 @@ jobs:
           report={'full_map':{'file':str(full),'objects':len(full_objs)}}
           report['full_map']['bounds']={a:[min(getattr(p,a) for p in full_pts),max(getattr(p,a) for p in full_pts)] for a in 'xyz'}
           with bpy.data.libraries.load(str(chunk),link=False) as (src,dst):
-            dst.objects=src.objects
-          chunk_objs=[]
-          for o in dst.objects:
-            if o is not None:
-              bpy.context.scene.collection.objects.link(o)
-              if o.type=='MESH':
-                mw=o.matrix_world.copy(); mw.translation.z-=20.0; o.matrix_world=mw
-                chunk_objs.append(o)
+            dst.collections=src.collections
+          chunk_cols=[]
+          for c in dst.collections:
+            if c is not None:
+              bpy.context.scene.collection.children.link(c)
+              chunk_cols.append(c)
+          chunk_objs=list({o for c in chunk_cols for o in c.all_objects if o.type=='MESH'})
+          for o in chunk_objs:
+            mw=o.matrix_world.copy(); mw.translation.z-=20.0; o.matrix_world=mw
           # Restore Clocktower image references using exact basename or archive-prefixed suffix.
           for im in bpy.data.images:
             if im.source=='FILE':
