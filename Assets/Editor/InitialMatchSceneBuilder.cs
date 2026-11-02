@@ -21,6 +21,7 @@ namespace FreeFire3D.EditorTools
         private const string MapPath = "Assets/Game/Maps/Clocktower/Clocktower.glb";
         private const string OliviaPath = "Assets/Game/Characters/Olivia/Olivia.glb";
         private const string AvatarPath = "Assets/Game/Characters/Olivia/OliviaAvatar.asset";
+        private const string ControllerPath = "Assets/Game/Characters/Olivia/Olivia.controller";
         private const string ScenePath = "Assets/Scenes/Match.unity";
         private const string MatchConfigPath = "Assets/Game/Match/MatchConfiguration.asset";
         private static bool building;
@@ -34,7 +35,7 @@ namespace FreeFire3D.EditorTools
             if (File.Exists(ScenePath) || building)
                 return;
 
-            if (File.Exists(MapPath) && File.Exists(OliviaPath) && File.Exists(AvatarPath))
+            if (File.Exists(MapPath) && File.Exists(OliviaPath) && File.Exists(AvatarPath) && File.Exists(ControllerPath))
                 EditorApplication.delayCall += BuildIfReady;
         }
 
@@ -50,16 +51,24 @@ namespace FreeFire3D.EditorTools
                 GameObject mapAsset = LoadRootAsset(MapPath);
                 GameObject oliviaAsset = LoadRootAsset(OliviaPath);
                 Avatar avatar = AssetDatabase.LoadAssetAtPath<Avatar>(AvatarPath);
+                RuntimeAnimatorController animationController =
+                    AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(ControllerPath);
 
                 if (mapAsset == null || oliviaAsset == null)
                 {
-                    Debug.LogWarning("Match scene is waiting for the Clocktower GLB and Olivia FBX importers.");
+                    Debug.LogWarning("Match scene is waiting for the Clocktower, Olivia and Quaternius animation assets.");
                     return;
                 }
 
-                if (avatar == null)
+                if (avatar == null || !avatar.isValid || !avatar.isHuman)
                 {
                     Debug.LogError("Match scene was not created because Olivia has no valid Humanoid Avatar.");
+                    return;
+                }
+
+                if (animationController == null)
+                {
+                    Debug.LogWarning("Match scene is waiting for the generated Olivia Animator Controller.");
                     return;
                 }
 
@@ -107,6 +116,7 @@ namespace FreeFire3D.EditorTools
                 if (animator == null)
                     animator = oliviaInstance.AddComponent<Animator>();
                 animator.avatar = avatar;
+                animator.runtimeAnimatorController = animationController;
                 animator.applyRootMotion = false;
                 animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
 
