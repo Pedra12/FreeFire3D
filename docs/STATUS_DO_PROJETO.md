@@ -4,7 +4,7 @@ Atualizado em 2026-11-02.
 
 ## Primeiro teste Android
 
-<badge>Build concluído</badge>
+**Build concluído**
 
 - Workflow: [First Android map test build](https://github.com/Pedra12/FreeFire3D/actions/runs/41368275211)
 - Godot: 4.7.2 stable.
