@@ -26,6 +26,8 @@ jobs:
           sudo apt-get install -y blender
       - name: Inspect animation FBX and verify core actions
         run: blender --background --python Tools/inspect_quaternius_fbx.py
+      - name: Confirm FBX inspection report exists
+        run: test -s Assets/Game/Animations/Quaternius/FBXInspectionReport.json
       - name: Commit FBX inspection report
         run: |
           git config user.name "github-actions[bot]"
