@@ -73,7 +73,9 @@ jobs:
             cam.data.type='ORTHO'; cam.data.ortho_scale=span; scene.camera=cam
             # Render with Eevee so MTL image textures are actually visible.
             # Ubuntu's apt Blender may be 3.x (BLENDER_EEVEE) or 4.x (EEVEE_NEXT).
-            engines=[item.identifier for item in scene.render.bl_rna.properties['engine'].enum_items]\n            eevee=next((name for name in engines if 'EEVEE' in name),None)\n            scene.render.engine=eevee or 'CYCLES'
+            engines=[item.identifier for item in scene.render.bl_rna.properties['engine'].enum_items]
+            eevee=next((name for name in engines if 'EEVEE' in name),None)
+            scene.render.engine=eevee or 'CYCLES'
             scene.render.resolution_x=1500; scene.render.resolution_y=1200; scene.render.resolution_percentage=100
             scene.render.image_settings.file_format='PNG'
             scene.view_settings.view_transform='Standard'
