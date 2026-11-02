@@ -12,13 +12,13 @@ namespace FreeFire3D.Input
         [SerializeField] private TPSCameraRig cameraRig;
 
         [Header("Gameplay events (connect after weapon/combat systems exist)")]
-        [SerializeField] private UnityEvent aimPressed;
-        [SerializeField] private UnityEvent aimReleased;
-        [SerializeField] private UnityEvent firePressed;
-        [SerializeField] private UnityEvent fireReleased;
-        [SerializeField] private UnityEvent reloadPressed;
-        [SerializeField] private UnityEvent crouchPressed;
-        [SerializeField] private UnityEvent weaponSwitchPressed;
+        [SerializeField] private UnityEvent aimPressed = new UnityEvent();
+        [SerializeField] private UnityEvent aimReleased = new UnityEvent();
+        [SerializeField] private UnityEvent firePressed = new UnityEvent();
+        [SerializeField] private UnityEvent fireReleased = new UnityEvent();
+        [SerializeField] private UnityEvent reloadPressed = new UnityEvent();
+        [SerializeField] private UnityEvent crouchPressed = new UnityEvent();
+        [SerializeField] private UnityEvent weaponSwitchPressed = new UnityEvent();
 
         public void Move(Vector2 value)
         {
