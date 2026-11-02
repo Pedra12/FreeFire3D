@@ -1,4 +1,5 @@
 name: Asset audit
+# 4v4 prototype: validate weapon, character, building, map and texture archives before integration
 
 on:
   push:
