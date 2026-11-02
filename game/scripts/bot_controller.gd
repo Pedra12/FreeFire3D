@@ -187,9 +187,8 @@ func apply_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, _hit_norm
 		var killer_team := int(source.get("team_id")) if is_instance_valid(source) and source.get("team_id") != null else -1
 		eliminated.emit(team_id, killer_team)
 		_play_action(&"Death")
-		await get_tree().create_timer(0.45).timeout
-		if is_instance_valid(self):
-			queue_free()
+		var cleanup_timer := get_tree().create_timer(0.45)
+		cleanup_timer.timeout.connect(queue_free)
 		return true
 	return false
 
