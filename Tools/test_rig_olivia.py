@@ -61,6 +61,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images), flush=True)
 loaded_image_indices = set()
+loaded_images_by_index = {}
 for image in list(bpy.data.images):
     match = re.search(r"Image[_ ]?(\d+)", image.name)
     if not match:
@@ -76,11 +77,18 @@ for image in list(bpy.data.images):
         raise SystemExit(f"Could not decode extracted Olivia image {index}: {path}")
     loaded.pack()
     loaded_image_indices.add(index)
-    for material in bpy.data.materials:
-        if material.use_nodes and material.node_tree:
-            for node in material.node_tree.nodes:
-                if node.type == "TEX_IMAGE" and node.image == image:
-                    node.image = loaded
+    loaded_images_by_index[index] = loaded
+
+for material in bpy.data.materials:
+    if material.use_nodes and material.node_tree:
+        for node in material.node_tree.nodes:
+            if node.type != "TEX_IMAGE" or node.image is None:
+                continue
+            match = re.search(r"Image[_ ]?(\d+)", node.image.name)
+            if match:
+                index = int(match.group(1))
+                if index in loaded_images_by_index:
+                    node.image = loaded_images_by_index[index]
 
 if loaded_image_indices != set(extracted_images.keys()):
     raise SystemExit(f"Not all embedded Olivia images were loaded: {sorted(loaded_image_indices)}")
