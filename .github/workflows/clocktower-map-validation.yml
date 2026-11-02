@@ -175,7 +175,7 @@ jobs:
                   "Zone_A_House_Medium_A_LOD0_0",
                   "Zone_A_House_Huge_A_LOD0_0",
                   "Zone_A_House_Big_B_LOD0_1",
-                  "Zone_A_Mansion_LOD0_0",
+                  "mansion_LOD0_0",
                   "Tower_01_LOD0_0"
               ]
               var buildings_with_floor: int = 0
