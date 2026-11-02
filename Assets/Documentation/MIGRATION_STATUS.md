@@ -44,7 +44,7 @@
 - License: CC0 1.0 Universal.
 - The archive SHA-256 is `cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724`.
 - Selected file: `Unity/UAL1_Standard.fbx`, root motion disabled. The reference GLB confirms 43 animation clips and 65 humanoid joints.
-- The FBX has not yet been imported by Unity, so its Avatar, imported clip names and retargeting are not yet editor-verified.
+- Blender 5.0.1 imported the actual Unity FBX and confirmed one armature, 65 bones, one donor mesh and all 43 animation actions. The nine required idle/walk/jog/sprint/crouch/jump actions are present. Unity's Humanoid Avatar import and retargeting remain unverified.
 
 ## Not yet completed
 
