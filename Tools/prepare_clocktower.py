@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.append('/usr/lib/python3/dist-packages')
 from PIL import Image
+import numpy as np
 
 import bpy
 from mathutils import Vector
@@ -131,14 +132,22 @@ for material in bpy.data.materials:
             try:
                 with Image.open(candidate) as source_image:
                     source_image.load()
-                    mode = "RGBA" if "A" in source_image.getbands() else "RGB"
-                    source_image.convert(mode).save(normalized_path, format="PNG", optimize=True)
+                    rgba = source_image.convert("RGBA").transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                    width, height = rgba.size
+                    pixels = np.asarray(rgba, dtype=np.float32) / 255.0
             except Exception as exc:
                 raise SystemExit(f"Texture decode failed for {candidate}: {exc}")
-            loaded_image = bpy.data.images.load(str(normalized_path), check_existing=False)
-            if not loaded_image.has_data or loaded_image.size[0] <= 0 or loaded_image.size[1] <= 0:
-                raise SystemExit(f"Blender could not decode normalized texture pixels: {normalized_path}")
+            loaded_image = bpy.data.images.new(
+                name=candidate.stem, width=width, height=height, alpha=True, float_buffer=False
+            )
+            loaded_image.pixels.foreach_set(pixels.reshape(-1))
+            loaded_image.update()
+            loaded_image.filepath_raw = str(normalized_path)
+            loaded_image.file_format = "PNG"
+            loaded_image.save()
             loaded_image.pack()
+            if not loaded_image.has_data or loaded_image.size[0] <= 0 or loaded_image.size[1] <= 0:
+                raise SystemExit(f"Blender pixel datablock creation failed: {candidate}")
             loaded_images_by_hash[digest] = loaded_image
         node.image = loaded_images_by_hash[digest]
 
