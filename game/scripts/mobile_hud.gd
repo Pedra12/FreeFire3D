@@ -23,6 +23,8 @@ var reload_center: Vector2
 var button_radius: float = 42.0
 var ammo_current: int = 30
 var ammo_reserve: int = 120
+var health_current: float = 100.0
+var health_maximum: float = 100.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -53,6 +55,11 @@ func get_move_vector() -> Vector2:
 func set_ammo(current: int, reserve: int) -> void:
 	ammo_current = current
 	ammo_reserve = reserve
+	queue_redraw()
+
+func set_health(current: float, maximum: float) -> void:
+	health_current = current
+	health_maximum = maxf(1.0, maximum)
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -128,7 +135,11 @@ func _draw() -> void:
 	_draw_button(aim_center, "MIRA", aiming)
 	_draw_button(fire_center, "ATIRAR", firing)
 	_draw_button(reload_center, "RECARREGAR", false, 34.0)
-	draw_string(ThemeDB.fallback_font, Vector2(28, 42), "Bermuda | Treino", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
+	draw_string(ThemeDB.fallback_font, Vector2(28, 42), "BERMUDA | SOBREVIVENCIA", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+	draw_string(ThemeDB.fallback_font, Vector2(28, 67), "VIDA %d%%" % int(round(health_current / health_maximum * 100.0)), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+	draw_rect(Rect2(28, 75, 180, 10), Color(0.02, 0.03, 0.04, 0.72), true)
+	var health_color := Color(0.20, 0.82, 0.36, 0.95) if health_current > 35.0 else Color(0.95, 0.24, 0.16, 0.98)
+	draw_rect(Rect2(28, 75, 180.0 * clampf(health_current / health_maximum, 0.0, 1.0), 10), health_color, true)
 	var ammo_text := "%02d / %03d" % [ammo_current, ammo_reserve]
 	draw_string(ThemeDB.fallback_font, Vector2(size.x - 190.0, 48.0), ammo_text, HORIZONTAL_ALIGNMENT_RIGHT, 160.0, 25, Color.WHITE)
 	if aiming:
