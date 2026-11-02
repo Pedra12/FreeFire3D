@@ -71,7 +71,7 @@ func _run_test() -> void:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: player AWM not attached to hand")
 		quit(1)
 		return
-	if int(inventory.get("ammo_762")) != 30 or int(inventory.get("medkits")) != 2 or int(inventory.get("grenades")) != 1:
+	if int(inventory.get("ammo_sniper")) != 20 or int(inventory.get("ammo_556")) != 120 or int(inventory.get("ammo_9mm")) != 90 or int(inventory.get("ammo_12g")) != 24 or int(inventory.get("medkits")) != 2 or int(inventory.get("grenades")) != 1:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: inventory starting loadout invalid")
 		quit(1)
 		return
@@ -87,8 +87,20 @@ func _run_test() -> void:
 		return
 
 	var loot_nodes := scene.get_node("LootSpawner").get_children()
-	if loot_nodes.is_empty():
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: no loot pickups spawned")
+	if loot_nodes.size() < 14:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: too few loot pickups spawned: %d" % loot_nodes.size())
+		quit(1)
+		return
+	var weapon_loot_count := 0
+	for loot in loot_nodes:
+		if String(loot.get("item_type")).begins_with("weapon_"):
+			weapon_loot_count += 1
+			if loot.get("weapon_visual") == null:
+				push_error("MAIN_GAMEPLAY_TEST_FAILED: 3D weapon loot visual missing for " + String(loot.get("item_type")))
+				quit(1)
+				return
+	if weapon_loot_count != 4:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: expected 4 weapon loot models, found %d" % weapon_loot_count)
 		quit(1)
 		return
 
@@ -120,5 +132,5 @@ func _run_test() -> void:
 		quit(1)
 		return
 
-	print("MAIN_GAMEPLAY_TEST_OK: map=RiverSide meshes=", map_meshes.size(), " bots=7 teams=3+4 loot=", loot_nodes.size(), " player_inventory=OK weapons=8 friendly_fire=OFF")
+	print("MAIN_GAMEPLAY_TEST_OK: map=RiverSide meshes=", map_meshes.size(), " bots=7 teams=3+4 loot=", loot_nodes.size(), " weapon_loot=", weapon_loot_count, " player_inventory=OK weapon_classes=5 friendly_fire=OFF")
 	quit(0)
