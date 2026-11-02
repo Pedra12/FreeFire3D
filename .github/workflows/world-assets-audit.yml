@@ -107,7 +107,7 @@ jobs:
                                   if found is not None:
                                       line="map_Kd "+os.path.relpath(found,path.parent).replace(os.sep,"/")
                               repaired.append(line)
-                          target_mtl.write_text("\\n".join(repaired)+"\\n",encoding="utf-8")
+                          target_mtl.write_text("\n".join(repaired)+"\n",encoding="utf-8")
                   bpy.ops.wm.obj_import(filepath=str(path))
               elif ext==".gltf" or ext==".glb":
                   bpy.ops.import_scene.gltf(filepath=str(path))
@@ -125,6 +125,19 @@ jobs:
               try:
                   reset()
                   import_candidate(path)
+                  # Repair external image paths embedded in Blender projects and FBX imports.
+                  for image in bpy.data.images:
+                      if image.source != "FILE" or not image.filepath:
+                          continue
+                      original=Path(bpy.path.abspath(image.filepath))
+                      if not original.is_file():
+                          matches=[candidate for candidate in root.rglob(original.name) if candidate.is_file()]
+                          if matches:
+                              image.filepath=str(matches[0])
+                              try:
+                                  image.reload()
+                              except Exception as image_error:
+                                  print("IMAGE_RELINK_WARNING",image.name,repr(image_error))
                   scene=bpy.context.scene
                   meshes=[o for o in scene.objects if o.type=="MESH"]
                   points=[]
