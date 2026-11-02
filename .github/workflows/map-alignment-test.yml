@@ -43,8 +43,8 @@ jobs:
         shell: bash
         run: |
           cat > /tmp/align.py <<'PY'
-          import bpy, pathlib, json, os, traceback
-          from mathutils import Vector
+          import bpy, pathlib, json, os, traceback, math
+          from mathutils import Vector, Matrix
           root=pathlib.Path('/tmp/assets')
           full=next(root.glob('*hh.blend'))
           chunk=next(root.glob('*CLOCKTOWER*.blend'))
@@ -62,7 +62,7 @@ jobs:
               chunk_cols.append(c)
           chunk_objs=list({o for c in chunk_cols for o in c.all_objects if o.type=='MESH'})
           for o in chunk_objs:
-            mw=o.matrix_world.copy(); mw.translation.z-=20.0; o.matrix_world=mw
+            o.matrix_world=Matrix.Translation(Vector((0,0,-20.0))) @ Matrix.Rotation(math.radians(90),4,'X') @ o.matrix_world
           # Restore Clocktower image references using exact basename or archive-prefixed suffix.
           for im in bpy.data.images:
             if im.source=='FILE':
