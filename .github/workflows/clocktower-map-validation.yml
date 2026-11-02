@@ -1,0 +1,184 @@
+name: Clocktower map Godot validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/clocktower-map-validation.yml"
+      - "tools/convert_clocktower.py"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Blender and system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender xz-utils curl unzip libegl1
+
+      - name: Install Blender 4.5 with package fallback
+        run: |
+          mkdir -p /opt/blender
+          if curl -L --fail --retry 2 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz; then
+            tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          else
+            echo "Official Blender archive unavailable; using Ubuntu package"
+            ln -sf "$(command -v blender)" /opt/blender/blender
+          fi
+          /opt/blender/blender --version
+
+      - name: Extract Clocktower source and relink texture directory
+        run: |
+          mkdir -p build/clocktower/source game/assets/maps
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          archive=Path("free-fire-clocktower-3d-model-by-rs-ratul.zip")
+          if not archive.is_file():
+              raise SystemExit("Clocktower source archive missing from repository")
+          root=Path("build/clocktower/source")
+          with zipfile.ZipFile(archive) as z:
+              z.extractall(root)
+          matches=list(root.rglob("FF CLOCKTOWER BY RATUL.blend"))
+          if len(matches)!=1:
+              raise SystemExit(f"Expected one Clocktower blend file, found {len(matches)}")
+          print("CLOCKTOWER_SOURCE",matches[0])
+          print("CLOCKTOWER_TEXTURE_FILES",sum(1 for p in root.rglob("*") if p.is_file() and p.suffix.lower() in {".png",".jpg",".jpeg"}))
+          Path("build/clocktower/source-path.txt").write_text(str(matches[0]),encoding="utf-8")
+          PY
+          echo "CLOCKTOWER_ROOT=$GITHUB_WORKSPACE/build/clocktower/source" >> "$GITHUB_ENV"
+          echo "CLOCKTOWER_BLEND=$GITHUB_WORKSPACE/$(cat build/clocktower/source-path.txt)" >> "$GITHUB_ENV"
+          echo "CLOCKTOWER_GLB=$GITHUB_WORKSPACE/game/assets/maps/clocktower.glb" >> "$GITHUB_ENV"
+
+      - name: Convert Clocktower to centered Y-up GLB with embedded textures
+        run: |
+          /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/convert_clocktower.py 2>&1 | tee build/clocktower/convert.log
+          grep "CLOCKTOWER_GLB_OK" build/clocktower/convert.log
+          test -s game/assets/maps/clocktower.glb
+
+      - name: Install Godot 4.7.2 headless
+        run: |
+          mkdir -p tools/godot
+          curl -L --fail --retry 3 https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d tools/godot
+          chmod +x tools/godot/Godot_v4.7.2-stable_linux.x86_64
+          echo "GODOT_BIN=$GITHUB_WORKSPACE/tools/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+
+      - name: Import Clocktower and validate geometry, textures and collisions
+        run: |
+          "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/clocktower/godot-import.log
+          cat > game/scripts/clocktower_map_audit.gd <<'GDSCRIPT'
+          extends SceneTree
+
+          func _initialize() -> void:
+              call_deferred("_audit")
+
+          func _audit() -> void:
+              var packed := load("res://assets/maps/clocktower.glb") as PackedScene
+              if packed == null:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: GLB did not import")
+                  quit(1)
+                  return
+              var test_root := Node3D.new()
+              root.add_child(test_root)
+              var map := packed.instantiate() as Node3D
+              if map == null:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: map root is not Node3D")
+                  quit(1)
+                  return
+              test_root.add_child(map)
+              await process_frame
+
+              var meshes := map.find_children("*", "MeshInstance3D", true, false)
+              if meshes.size() < 30:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: expected at least 30 meshes, found %d" % meshes.size())
+                  quit(1)
+                  return
+
+              var min_point := Vector3(INF, INF, INF)
+              var max_point := Vector3(-INF, -INF, -INF)
+              var textured_surfaces := 0
+              var collider_count := 0
+              for node in meshes:
+                  var mesh_instance := node as MeshInstance3D
+                  if mesh_instance.mesh == null:
+                      continue
+                  var aabb := mesh_instance.get_aabb()
+                  for corner_index in range(8):
+                      var point := mesh_instance.global_transform * aabb.get_endpoint(corner_index)
+                      min_point = min_point.min(point)
+                      max_point = max_point.max(point)
+                  for surface in range(mesh_instance.mesh.get_surface_count()):
+                      var material := mesh_instance.get_active_material(surface)
+                      if material is StandardMaterial3D and (material as StandardMaterial3D).albedo_texture != null:
+                          textured_surfaces += 1
+                  var before := mesh_instance.get_child_count()
+                  mesh_instance.create_trimesh_collision()
+                  if mesh_instance.get_child_count() > before:
+                      collider_count += 1
+
+              var dimensions := max_point - min_point
+              print("CLOCKTOWER_GEOMETRY meshes=", meshes.size(), " dimensions=", dimensions,
+                  " textured_surfaces=", textured_surfaces, " colliders=", collider_count)
+              if dimensions.x < 70.0 or dimensions.x > 100.0 or dimensions.y < 20.0 or dimensions.y > 35.0 or dimensions.z < 95.0 or dimensions.z > 130.0:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: unexpected map orientation or scale")
+                  quit(2)
+                  return
+              if textured_surfaces < 5:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: map textures did not import")
+                  quit(3)
+                  return
+              if collider_count < 30:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: not enough mesh collisions")
+                  quit(4)
+                  return
+
+              await physics_frame
+              await physics_frame
+              var space := test_root.get_world_3d().direct_space_state
+              var samples := [
+                  Vector3(0.0, 100.0, 0.0),
+                  Vector3(-27.0, 100.0, -12.0),
+                  Vector3(25.0, 100.0, -4.0),
+                  Vector3(-17.0, 100.0, 7.0),
+                  Vector3(39.0, 100.0, 3.0),
+                  Vector3(-5.0, 100.0, -33.0),
+                  Vector3(-6.0, 100.0, 26.0)
+              ]
+              var hit_count := 0
+              var heights: Array[float] = []
+              for sample in samples:
+                  var query := PhysicsRayQueryParameters3D.create(sample, Vector3(sample.x, -20.0, sample.z))
+                  var hit := space.intersect_ray(query)
+                  if not hit.is_empty():
+                      hit_count += 1
+                      heights.append(float(hit.position.y))
+              print("CLOCKTOWER_FLOOR_RAYS hits=", hit_count, "/", samples.size(), " heights=", heights)
+              if hit_count < 4:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: ground and building collision coverage too low")
+                  quit(5)
+                  return
+              print("CLOCKTOWER_MAP_AUDIT_OK: meshes=", meshes.size(), " textures=", textured_surfaces,
+                  " colliders=", collider_count, " floor_hits=", hit_count)
+              quit(0)
+          GDSCRIPT
+          "$GODOT_BIN" --headless --path game --script res://scripts/clocktower_map_audit.gd 2>&1 | tee build/clocktower/map-audit.log
+          grep "CLOCKTOWER_MAP_AUDIT_OK" build/clocktower/map-audit.log
+
+      - name: Upload Clocktower map validation package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clocktower-map-godot-validation
+          path: |
+            game/assets/maps/clocktower.glb
+            game/assets/maps/clocktower.glb.json
+            build/clocktower/
+          if-no-files-found: warn
+          retention-days: 14
