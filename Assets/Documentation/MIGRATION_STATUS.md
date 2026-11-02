@@ -22,7 +22,8 @@
 - 7 meshes, 12,079 vertices and 17,719 faces.
 - World bounds are approximately 2.792 m wide, 0.883 m deep and 5.078 m tall. The source needs a deliberate scale correction before gameplay.
 - 0 armatures, 0 skins and 0 animation clips. This source model is **not rigged**.
-- The one approved output is now `Olivia.glb`, with a generated humanoid skeleton and skin weights. The pipeline must pass a pose-deformation test, skinned-GLB export and re-import validation before it is committed.
+- The one approved output is now `Olivia.glb`, with a generated humanoid skeleton and skin weights. The Blender pipeline passed its pose-deformation test, skinned-GLB export and round-trip re-import validation; the committed model contains 7 skinned mesh nodes, 1 skin, 22 bones and 10 embedded textures.
+- The final GLB is 2,687,664 bytes, has a SHA-256 recorded in `OliviaRigReport.json`, and its corrected height is 1.78 m. An extra 42-vertex `Icosphere` helper appears on Blender re-import but is not present in the exported GLB mesh-node list and is excluded from the seven validated character meshes.
 - `OliviaAvatarAssetBuilder.cs` is prepared to build a Unity Humanoid Avatar from the imported skeleton and save `OliviaAvatar.asset`. This Unity Editor step has not yet been executed or validated.
 - Source appears to match Sketchfab “Olivia free fire” by Xman, listed CC BY; confirm the match and preserve attribution before distribution.
 
@@ -37,7 +38,6 @@
 
 ## Not yet completed
 
-- Olivia rigged GLB generation and round-trip validation.
 - Unity Editor validation of the Olivia Humanoid Avatar.
 - Automatic creation and inspection of `Assets/Scenes/Match.unity`.
 - No Unity Editor C# compile, scene play test, Android build or real-device test has been performed.
