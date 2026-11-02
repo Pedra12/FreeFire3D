@@ -1,5 +1,13 @@
 extends SceneTree
 
+const WEAPON_PATHS := {
+	&"awm": "res://assets/weapons/awm_free_fire.glb",
+	&"assault_rifle": "res://assets/weapons/assault_rifle.glb",
+	&"smg": "res://assets/weapons/smg.glb",
+	&"shotgun": "res://assets/weapons/shotgun.glb",
+	&"pistol": "res://assets/weapons/pistol.glb"
+}
+
 func _initialize() -> void:
 	call_deferred("_audit")
 
@@ -17,70 +25,91 @@ func _audit() -> void:
 	test_root.add_child(test_hud)
 	var player := player_scene.instantiate()
 	test_root.add_child(player)
-	await process_frame
-	await process_frame
+	await create_timer(0.15).timeout
 
-	var model := player.get_node_or_null("VisualRoot/FemalePlayer") as Node3D
-	if model == null:
-		push_error("RIG_AUDIT_FAILED: exported character instance missing")
+	var model := player.get_node_or_null("VisualRoot/Olivia") as Node3D
+	if model == null or model.scene_file_path != "res://assets/characters/olivia_rigged.glb":
+		push_error("RIG_AUDIT_FAILED: Olivia is not the selected playable model")
 		quit(1)
 		return
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	var meshes := model.find_children("*", "MeshInstance3D", true, false)
 	var anim_nodes := model.find_children("*", "AnimationPlayer", true, false)
 	print("RIG_AUDIT skeletons=", skeletons.size(), " meshes=", meshes.size(), " animation_players=", anim_nodes.size())
-	if skeletons.is_empty() or meshes.is_empty() or anim_nodes.is_empty():
-		push_error("RIG_AUDIT_FAILED: expected Skeleton3D + MeshInstance3D + AnimationPlayer")
+	if skeletons.size() != 1 or meshes.size() < 5 or anim_nodes.is_empty():
+		push_error("RIG_AUDIT_FAILED: Olivia skeleton, skinned meshes or AnimationPlayer missing")
 		quit(1)
 		return
 
 	var skeleton := skeletons[0] as Skeleton3D
 	var anim_player := anim_nodes[0] as AnimationPlayer
 	print("RIG_BONES count=", skeleton.get_bone_count())
-	for i in range(skeleton.get_bone_count()):
-		var bone_name := skeleton.get_bone_name(i)
-		if "hand" in bone_name.to_lower() or "wrist" in bone_name.to_lower() or "arm" in bone_name.to_lower():
-			print("RIG_HAND_BONE=", bone_name)
-
-	var animation_names := anim_player.get_animation_list()
-	if model.scene_file_path != "res://assets/characters/olivia_rigged.glb":
-		push_error("RIG_AUDIT_FAILED: Olivia is not the selected playable model")
+	if skeleton.get_bone_count() < 40:
+		push_error("RIG_AUDIT_FAILED: Olivia skeleton has too few bones")
 		quit(1)
 		return
-	for required_clip in [&"Idle_Loop", &"Walk_Loop", &"Sprint_Loop", &"Jump_Start", &"Jump_Loop", &"Pistol_Aim_Neutral", &"Pistol_Shoot", &"Pistol_Reload"]:
-		if not anim_player.has_animation(required_clip):
-			push_error("RIG_AUDIT_FAILED: missing Olivia animation " + String(required_clip))
+	var animation_names := anim_player.get_animation_list()
+	var required_groups := [
+		[&"Idle_Loop", &"Idle"],
+		[&"Walk_Loop", &"Walk"],
+		[&"Sprint_Loop", &"Sprint"],
+		[&"Jump_Start"],
+		[&"Jump_Loop", &"Jump"],
+		[&"Pistol_Aim_Neutral"],
+		[&"Pistol_Shoot"],
+		[&"Pistol_Reload"]
+	]
+	for aliases in required_groups:
+		var found := false
+		for clip in aliases:
+			if anim_player.has_animation(clip):
+				found = true
+				break
+		if not found:
+			push_error("RIG_AUDIT_FAILED: required movement or combat animation missing: " + str(aliases))
 			quit(1)
 			return
-	print("OLIVIA_PLAYER_MODEL_OK required_movement_combat_clips=8")
-	print("RIG_ANIMATION_COUNT=", animation_names.size())
-	for animation_name in animation_names:
-		print("RIG_ANIMATION=", animation_name)
-	if animation_names.is_empty():
-		push_error("RIG_AUDIT_FAILED: AnimationPlayer has no clips")
-		quit(1)
-		return
+	print("OLIVIA_PLAYER_MODEL_OK bones=", skeleton.get_bone_count(), " meshes=", meshes.size(), " clips=", animation_names.size())
 
-	var weapon_scene := load("res://assets/weapons/awm_free_fire.glb") as PackedScene
-	if weapon_scene == null:
-		push_error("WEAPON_AUDIT_FAILED: AWM GLB unavailable")
-		quit(1)
-		return
-	var weapon := weapon_scene.instantiate()
-	root.add_child(weapon)
-	await process_frame
-	var weapon_meshes := weapon.find_children("*", "MeshInstance3D", true, false)
-	if weapon_meshes.is_empty():
-		push_error("WEAPON_AUDIT_FAILED: AWM contains no MeshInstance3D")
-		quit(1)
-		return
-	print("WEAPON_MESH_COUNT=", weapon_meshes.size())
+	for weapon_id in WEAPON_PATHS:
+		var weapon_scene := load(WEAPON_PATHS[weapon_id]) as PackedScene
+		if weapon_scene == null:
+			push_error("WEAPON_AUDIT_FAILED: missing " + String(weapon_id) + " at " + WEAPON_PATHS[weapon_id])
+			quit(1)
+			return
+		var weapon := weapon_scene.instantiate() as Node3D
+		root.add_child(weapon)
+		await process_frame
+		var weapon_meshes := weapon.find_children("*", "MeshInstance3D", true, false)
+		if weapon_meshes.is_empty():
+			push_error("WEAPON_AUDIT_FAILED: " + String(weapon_id) + " contains no mesh")
+			quit(1)
+			return
+		print("WEAPON_MODEL_OK id=", weapon_id, " meshes=", weapon_meshes.size())
+		weapon.queue_free()
+
 	var mount := player.get_node_or_null("WeaponMount")
-	if mount == null or mount.get("mounted_weapon") == null:
-		push_error("WEAPON_AUDIT_FAILED: weapon not mounted on rig hand")
+	var combat := player.get_node_or_null("CombatController")
+	if mount == null or combat == null:
+		push_error("WEAPON_AUDIT_FAILED: player mount or combat controller missing")
 		quit(1)
 		return
-	print("RIG_AND_WEAPON_INTEGRATION_OK: skeleton=", skeleton.get_bone_count(),
-		" animations=", animation_names.size(), " weapon_meshes=", weapon_meshes.size())
+	for weapon_id in [&"awm", &"assault_rifle", &"smg", &"shotgun", &"pistol"]:
+		if not bool(mount.call("equip_weapon", weapon_id)):
+			push_error("WEAPON_AUDIT_FAILED: cannot mount " + String(weapon_id))
+			quit(1)
+			return
+		if not bool(combat.call("equip_weapon", weapon_id)):
+			push_error("WEAPON_AUDIT_FAILED: cannot configure combat for " + String(weapon_id))
+			quit(1)
+			return
+		await create_timer(0.12).timeout
+		if mount.get("current_weapon_id") != weapon_id or mount.get("mounted_weapon") == null:
+			push_error("WEAPON_AUDIT_FAILED: mount did not finish equipping " + String(weapon_id))
+			quit(1)
+			return
+		print("WEAPON_EQUIP_OK id=", weapon_id, " magazine=", combat.get("magazine_size"))
+	print("RIG_AND_WEAPON_INTEGRATION_OK: Olivia skeleton=", skeleton.get_bone_count(),
+		" animations=", animation_names.size(), " weapon_classes=", WEAPON_PATHS.size())
 	print("WEAPON_AUDIT_OK")
 	quit(0)
