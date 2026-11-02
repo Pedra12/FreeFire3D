@@ -1,14 +1,15 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
-[ext_resource type="PackedScene" path="res://assets/maps/full_map_test.glb" id="1_map"]
+[ext_resource type="PackedScene" path="res://assets/maps/bermuda_masterizado.glb" id="1_map"]
 [ext_resource type="Script" path="res://scripts/camera_orbit.gd" id="2_camera"]
+[ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="3_collisions"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
 background_color = Color(0.055, 0.075, 0.105, 1)
 ambient_light_source = 3
 ambient_light_color = Color(0.82, 0.86, 0.92, 1)
-ambient_light_energy = 0.75
+ambient_light_energy = 0.85
 tonemap_mode = 2
 
 [node name="Main" type="Node3D"]
@@ -17,6 +18,7 @@ tonemap_mode = 2
 environment = SubResource("Environment_main")
 
 [node name="Map" parent="." instance=ExtResource("1_map")]
+script = ExtResource("3_collisions")
 
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("2_camera")
@@ -40,4 +42,4 @@ offset_right = 760.0
 offset_bottom = 62.0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 26
-text = "FREEFIRE 3D  |  PRIMEIRO TESTE DO MAPA"
+text = "FREEFIRE 3D  |  BERMUDA MASTERIZADO"
