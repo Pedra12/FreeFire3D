@@ -132,7 +132,10 @@ namespace FreeFire3D.EditorTools
                 if (!AssetDatabase.Contains(avatar))
                     Debug.LogError("Olivia Avatar was valid in memory but could not be saved as an asset.");
                 else
+                {
                     Debug.Log("Olivia Humanoid Avatar built and saved successfully.");
+                    InitialMatchSceneBuilder.BuildIfReady();
+                }
             }
             catch (Exception exception)
             {
