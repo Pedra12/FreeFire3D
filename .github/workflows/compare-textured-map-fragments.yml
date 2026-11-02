@@ -53,6 +53,21 @@ jobs:
           obj=max(objs,key=lambda p:p.stat().st_size)
           mtls=list((root/'fragment').rglob('*.mtl'))
           mtl=next((p for p in mtls if p.stem==obj.stem),mtls[0] if mtls else None)
+          # Repair the OBJ material library's stale absolute texture paths by copying
+          # the archive's texture files beside the OBJ using their original names.
+          model_dir=obj.parent
+          for tex in (root/'fragment').rglob('*'):
+            if tex.is_file() and tex.suffix.lower() in ('.png','.jpg','.jpeg','.tga') and tex.parent != model_dir:
+              target=model_dir/tex.name
+              if not target.exists(): target.write_bytes(tex.read_bytes())
+          if mtl and mtl.exists():
+            lines=[]
+            for line in mtl.read_text(errors='ignore').splitlines():
+              if line.lower().startswith(('map_kd ','map_ka ','map_ks ','map_bump ','bump ')):
+                parts=line.split()
+                if len(parts)>1: line=parts[0]+' '+pathlib.Path(parts[-1]).name
+              lines.append(line)
+            mtl.write_text('\\n'.join(lines)+'\\n')
           bpy.ops.wm.open_mainfile(filepath=str(blend))
           full=[o for o in bpy.context.scene.objects if o.type=='MESH']
           def bounds(objects):
@@ -72,13 +87,25 @@ jobs:
             report['same_coordinate_overlap']=[round(max(0,min(fb['max'][i],mb['max'][i])-max(fb['min'][i],mb['min'][i])),3) for i in range(3)]
             report['fragment_center']=[round((mb['min'][i]+mb['max'][i])/2,3) for i in range(3)]
             report['full_center']=[round((fb['min'][i]+fb['max'][i])/2,3) for i in range(3)]
+          def object_rows(objects):
+            rows=[]
+            for o in objects:
+              b=bounds([o])
+              rows.append({'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'bounds':b,'dimensions':dims(b)})
+            return rows
+          report['full_objects']=object_rows(full)
+          report['fragment_objects']=object_rows(frag)
           pathlib.Path('audit/geometry-comparison.json').write_text(json.dumps(report,indent=2))
           for o in full:
             mat=bpy.data.materials.new('FullMapNeutral'); mat.diffuse_color=(0.62,0.66,0.68,1); o.data.materials.clear(); o.data.materials.append(mat)
           for o in frag:
             mat=bpy.data.materials.new('FragmentNeutral'); mat.diffuse_color=(0.18,0.42,0.2,1); o.data.materials.clear(); o.data.materials.append(mat)
           scene=bpy.context.scene
-          scene.render.engine='BLENDER_EEVEE_NEXT'
+          scene.render.engine='BLENDER_WORKBENCH'
+          scene.display.shading.light='STUDIO'
+          scene.display.shading.color_type='MATERIAL'
+          scene.display.shading.show_shadows=True
+          scene.display.shading.show_cavity=True
           scene.render.resolution_x=1400; scene.render.resolution_y=1100; scene.render.resolution_percentage=100
           allb=[fb,mb]; mn=[min(b['min'][i] for b in allb) for i in range(3)]; mx=[max(b['max'][i] for b in allb) for i in range(3)]
           center=Vector([(mn[i]+mx[i])/2 for i in range(3)])
