@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - ".github/workflows/asset-audit.yml"
+      - "docs/asset-audit-trigger.md"
       - "*.zip"
       - "*.usdz"
   workflow_dispatch:
@@ -23,60 +24,45 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
-          import json, os, zipfile, hashlib, struct
+          import json, zipfile, hashlib, struct
           from pathlib import Path
 
-          root = Path(".")
           report = {"notice": "Read-only audit. Original repository assets are not modified.", "archives": []}
-          supported = {".zip", ".usdz"}
-          for path in sorted(p for p in root.iterdir() if p.is_file() and p.suffix.lower() in supported):
-              item = {
-                  "archive": path.name,
-                  "bytes": path.stat().st_size,
-                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                  "entries": [],
-                  "entry_count": 0,
-                  "total_uncompressed_bytes": 0,
-                  "formats": {}
-              }
+          for path in sorted(p for p in Path(".").iterdir() if p.is_file() and p.suffix.lower() in {".zip", ".usdz"}):
+              item = {"archive": path.name, "bytes": path.stat().st_size,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                      "entries": [], "entry_count": 0, "total_uncompressed_bytes": 0, "formats": {}}
               try:
                   with zipfile.ZipFile(path) as z:
                       infos = [i for i in z.infolist() if not i.is_dir()]
                       item["entry_count"] = len(infos)
                       item["total_uncompressed_bytes"] = sum(i.file_size for i in infos)
                       for info in infos:
-                          name = info.filename
-                          ext = Path(name).suffix.lower() or "[no extension]"
+                          ext = Path(info.filename).suffix.lower() or "[no extension]"
                           item["formats"][ext] = item["formats"].get(ext, 0) + 1
-                          entry = {"path": name, "bytes": info.file_size, "compressed_bytes": info.compress_size}
-                          if ext in {".gltf", ".json", ".mtl", ".dae", ".obj", ".fbx", ".glb", ".png", ".jpg", ".jpeg", ".webp", ".tga", ".ktx", ".dds"}:
+                          entry = {"path": info.filename, "bytes": info.file_size, "compressed_bytes": info.compress_size}
+                          if ext in {".obj", ".gltf", ".glb", ".fbx", ".dae", ".mtl", ".png", ".jpg", ".jpeg", ".webp", ".tga", ".ktx", ".dds"}:
                               try:
                                   data = z.read(info)
                                   if ext == ".obj":
-                                      text = data[:8_000_000].decode("utf-8", "replace")
-                                      entry["obj_stats"] = {
-                                          "vertices": sum(1 for line in text.splitlines() if line.startswith("v ")),
-                                          "uvs": sum(1 for line in text.splitlines() if line.startswith("vt ")),
-                                          "normals": sum(1 for line in text.splitlines() if line.startswith("vn ")),
-                                          "faces": sum(1 for line in text.splitlines() if line.startswith("f "))
-                                      }
+                                      lines = data[:12000000].decode("utf-8", "replace").splitlines()
+                                      entry["obj_stats"] = {k: sum(1 for line in lines if line.startswith(prefix)) for k,prefix in
+                                                            [("vertices","v "),("uvs","vt "),("normals","vn "),("faces","f ")]}
                                   elif ext == ".gltf":
-                                      doc = json.loads(data.decode("utf-8-sig"))
-                                      entry["gltf"] = {
-                                          "asset": doc.get("asset", {}),
-                                          "scenes": len(doc.get("scenes", [])),
-                                          "nodes": len(doc.get("nodes", [])),
-                                          "meshes": len(doc.get("meshes", [])),
-                                          "materials": len(doc.get("materials", [])),
-                                          "textures": len(doc.get("textures", [])),
-                                          "images": doc.get("images", []),
-                                          "buffers": doc.get("buffers", [])
-                                      }
-                                  elif ext == ".glb":
-                                      entry["glb_header"] = data[:12].hex()
-                                      if len(data) >= 12:
-                                          entry["glb_version"] = struct.unpack("<I", data[4:8])[0]
-                                          entry["glb_declared_length"] = struct.unpack("<I", data[8:12])[0]
+                                      d = json.loads(data.decode("utf-8-sig"))
+                                      entry["gltf"] = {"asset": d.get("asset", {}), "scenes": len(d.get("scenes", [])),
+                                                       "nodes": len(d.get("nodes", [])), "meshes": len(d.get("meshes", [])),
+                                                       "materials": len(d.get("materials", [])), "textures": len(d.get("textures", [])),
+                                                       "images": d.get("images", []), "buffers": d.get("buffers", [])}
+                                  elif ext == ".glb" and len(data) >= 12:
+                                      entry["glb_version"] = struct.unpack("<I", data[4:8])[0]
+                                      entry["glb_declared_length"] = struct.unpack("<I", data[8:12])[0]
+                                  elif ext == ".fbx":
+                                      entry["fbx_header"] = data[:32].decode("latin1", "replace")
+                                  elif ext == ".dae":
+                                      entry["dae_has_geometry"] = b"<geometry" in data[:2000000]
+                                  elif ext == ".mtl":
+                                      entry["mtl_materials"] = [s.strip() for s in data.decode("utf-8", "replace").splitlines() if s.startswith("newmtl ")]
                                   elif ext in {".png", ".jpg", ".jpeg"}:
                                       try:
                                           from PIL import Image
@@ -85,12 +71,6 @@ jobs:
                                           entry["image"] = {"width": im.width, "height": im.height, "mode": im.mode}
                                       except Exception as e:
                                           entry["image_inspection"] = str(e)[:160]
-                                  elif ext == ".fbx":
-                                      entry["fbx_header"] = data[:32].decode("latin1", "replace")
-                                  elif ext == ".dae":
-                                      entry["dae_has_geometry"] = b"<geometry" in data[:2_000_000]
-                                  elif ext == ".mtl":
-                                      entry["mtl_materials"] = [line.strip() for line in data.decode("utf-8", "replace").splitlines() if line.startswith("newmtl ")]
                               except Exception as e:
                                   entry["inspection_error"] = str(e)[:240]
                           item["entries"].append(entry)
@@ -102,7 +82,7 @@ jobs:
           with open("asset-audit-summary.txt", "w", encoding="utf-8") as f:
               f.write("ASSET AUDIT - READ ONLY\n\n")
               for a in report["archives"]:
-                  f.write(f'{a["archive"]}: {a.get("entry_count", 0)} arquivos internos; {a.get("total_uncompressed_bytes", 0)} bytes descompactados\n')
+                  f.write(f'{a["archive"]}: {a.get("entry_count", 0)} arquivos; {a.get("total_uncompressed_bytes", 0)} bytes descompactados\n')
                   f.write("Formatos: " + ", ".join(f'{k}={v}' for k,v in sorted(a.get("formats", {}).items())) + "\n")
                   if a.get("archive_error"): f.write("ERRO: " + a["archive_error"] + "\n")
                   f.write("\n")
