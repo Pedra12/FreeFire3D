@@ -1,0 +1,169 @@
+name: Battle Royale world asset candidates audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/world-assets-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender libegl1 python3-numpy
+      - name: Extract map, building and arena source archives
+        run: |
+          mkdir -p audit/world_candidates
+          python3 - <<'PY'
+          import zipfile, pathlib, json
+          sources = [
+            "free-fire-ful-map.zip",
+            "free-fire-burmuda-map-the-circuit-3d-model.zip",
+            "free-fire-lone-wolf-mode-3d-model.zip",
+            "free-fire-nexterra-map.zip",
+            "free-fire-clocktower-3d-model-by-rs-ratul.zip",
+            "free-fire-old-peak-house-by-no-rules-yt.zip"
+          ]
+          root=pathlib.Path("audit/world_candidates")
+          reports=[]
+          def unpack(path, dest, depth=0):
+              if depth>3: return
+              try:
+                  with zipfile.ZipFile(path) as z:
+                      z.extractall(dest)
+                      for item in dest.rglob("*.zip"):
+                          if item.resolve()==path.resolve(): continue
+                          target=item.parent/(item.stem+"_extracted")
+                          if not target.exists():
+                              unpack(item,target,depth+1)
+              except Exception as e:
+                  reports.append({"archive":str(path),"error":repr(e)})
+          for source in sources:
+              p=pathlib.Path(source)
+              if not p.exists():
+                  reports.append({"archive":source,"error":"not found"})
+                  continue
+              dest=root/p.stem
+              unpack(p,dest)
+              reports.append({"archive":source,"bytes":p.stat().st_size,"extracted_to":str(dest)})
+          (root/"extraction-report.json").write_text(json.dumps(reports,indent=2),encoding="utf8")
+          print(json.dumps(reports,indent=2))
+          PY
+      - name: Inspect models and render comparison previews
+        run: |
+          cat > audit/inspect_world_candidates.py <<'PY'
+          import bpy, json, os, glob, traceback
+          from pathlib import Path
+          from mathutils import Vector
+          root=Path("audit/world_candidates")
+          candidates=[
+            ("full_map_blend", "**/hh.blend"),
+            ("the_circuit", "**/The Circuit.obj"),
+            ("lone_wolf_arena", "**/scene.gltf"),
+            ("nexterra", "**/Streamer_AS (merge).fbx"),
+            ("clocktower", "**/FF CLOCKTOWER BY RATUL.blend"),
+            ("old_peak_house", "**/untitled.fbx")
+          ]
+          def reset():
+              bpy.ops.wm.read_factory_settings(use_empty=True)
+          def import_candidate(path):
+              ext=path.suffix.lower()
+              if ext==".blend":
+                  with bpy.data.libraries.load(str(path),link=False) as (src,dst):
+                      dst.objects=list(src.objects)
+                  for obj in dst.objects:
+                      if obj is not None:
+                          bpy.context.scene.collection.objects.link(obj)
+              elif ext==".obj":
+                  bpy.ops.wm.obj_import(filepath=str(path))
+              elif ext==".gltf" or ext==".glb":
+                  bpy.ops.import_scene.gltf(filepath=str(path))
+              elif ext==".fbx":
+                  bpy.ops.import_scene.fbx(filepath=str(path),use_image_search=True)
+              else:
+                  raise RuntimeError("unsupported extension "+ext)
+          results=[]
+          for label,pattern in candidates:
+              matches=list(root.glob(pattern))
+              if not matches:
+                  results.append({"candidate":label,"error":"model file not found","pattern":pattern})
+                  continue
+              path=matches[0]
+              try:
+                  reset()
+                  import_candidate(path)
+                  scene=bpy.context.scene
+                  meshes=[o for o in scene.objects if o.type=="MESH"]
+                  points=[]
+                  objects=[]
+                  for o in meshes:
+                      corners=[o.matrix_world @ Vector(c) for c in o.bound_box]
+                      points.extend(corners)
+                      objects.append({"name":o.name,"vertices":len(o.data.vertices),"triangles":sum(max(0,len(p.vertices)-2) for p in o.data.polygons),"materials":[m.name if m else None for m in o.data.materials]})
+                  images=[]
+                  for image in bpy.data.images:
+                      if image.type=="IMAGE":
+                          images.append({"name":image.name,"size":list(image.size),"packed":bool(image.packed_file),"path":image.filepath})
+                  report={"candidate":label,"source":str(path),"blender":bpy.app.version_string,"object_count":len(scene.objects),"mesh_count":len(meshes),"vertices":sum(len(o.data.vertices) for o in meshes),"triangles":sum(sum(max(0,len(p.vertices)-2) for p in o.data.polygons) for o in meshes),"materials":len(bpy.data.materials),"images":images,"objects":objects[:100],"armatures":sum(o.type=="ARMATURE" for o in scene.objects)}
+                  if points:
+                      lo=Vector([min(p[i] for p in points) for i in range(3)])
+                      hi=Vector([max(p[i] for p in points) for i in range(3)])
+                      center=(lo+hi)*0.5
+                      dims=hi-lo
+                      report["bounds"]={"min":list(lo),"max":list(hi)}
+                      report["dimensions"]=list(dims)
+                      report["max_dimension"]=max(dims)
+                      # Top-down/isometric preview that fits the complete source.
+                      diagonal=max(dims.length,1.0)
+                      cam_data=bpy.data.cameras.new(label+"_Camera")
+                      cam=bpy.data.objects.new(label+"_Camera",cam_data)
+                      scene.collection.objects.link(cam)
+                      cam.location=center+Vector((1.35,-1.7,1.3)).normalized()*diagonal*1.65
+                      cam.rotation_euler=(center-cam.location).to_track_quat("-Z","Y").to_euler()
+                      cam_data.type="ORTHO"
+                      cam_data.ortho_scale=max(dims.x,dims.y,dims.z)*1.35
+                      scene.camera=cam
+                      light_data=bpy.data.lights.new(label+"_Key","AREA")
+                      light=bpy.data.objects.new(label+"_Key",light_data)
+                      scene.collection.objects.link(light)
+                      light.location=center+Vector((2,-3,4))*max(diagonal*0.3,1.0)
+                      light_data.energy=1800
+                      light_data.size=max(diagonal*0.25,2.0)
+                      scene.render.engine="BLENDER_EEVEE"
+                      scene.render.resolution_x=1200
+                      scene.render.resolution_y=900
+                      scene.render.resolution_percentage=100
+                      scene.render.image_settings.file_format="PNG"
+                      preview=f"audit/world_candidates/{label}-preview.png"
+                      scene.render.filepath=os.path.abspath(preview)
+                      bpy.ops.render.render(write_still=True)
+                      report["preview"]=preview
+                  else:
+                      report["error"]="no mesh geometry"
+                  Path(f"audit/world_candidates/{label}-report.json").write_text(json.dumps(report,indent=2),encoding="utf8")
+                  print("WORLD_CANDIDATE",json.dumps({k:report.get(k) for k in ["candidate","source","mesh_count","vertices","triangles","materials","armatures","dimensions","preview","error"]}))
+                  results.append(report)
+              except Exception as e:
+                  report={"candidate":label,"source":str(path),"error":repr(e),"traceback":traceback.format_exc()[-5000:]}
+                  Path(f"audit/world_candidates/{label}-report.json").write_text(json.dumps(report,indent=2),encoding="utf8")
+                  print("WORLD_CANDIDATE_ERROR",json.dumps(report))
+                  results.append(report)
+          Path("audit/world_candidates/world-candidates-summary.json").write_text(json.dumps(results,indent=2),encoding="utf8")
+          PY
+          blender -b -t 2 --python audit/inspect_world_candidates.py 2>&1 | tee audit/world_candidates/blender-audit.log
+      - name: Upload world candidate audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-assets-candidates-audit
+          path: audit/world_candidates/
+          if-no-files-found: error
+          retention-days: 14
