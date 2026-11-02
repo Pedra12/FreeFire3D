@@ -129,8 +129,10 @@ jobs:
         run: |
           "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
           "$GODOT_BIN" --headless --path game --script res://scripts/scale_audit.gd 2>&1 | tee build/scale-audit.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/combat_smoke_test.gd 2>&1 | tee build/combat-smoke-test.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/combat_smoke_test.gd 2>&1 | tee build/combat-smoke-test.log build/main-gameplay-smoke-test.log
           grep "COMBAT_TEST_OK" build/combat-smoke-test.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/main_gameplay_smoke_test.gd 2>&1 | tee build/main-gameplay-smoke-test.log
+          grep "MAIN_GAMEPLAY_TEST_OK" build/main-gameplay-smoke-test.log
           "$GODOT_BIN" --headless --path game --quit-after 8 2>&1 | tee build/godot-smoke-test.log
           grep "BERMUDA_COLLISIONS generated=" build/godot-smoke-test.log
           grep -E "ERROR:|SCRIPT ERROR:" build/godot-import.log build/godot-smoke-test.log build/combat-smoke-test.log && exit 1 || true
