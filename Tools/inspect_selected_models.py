@@ -21,6 +21,14 @@ def inspect_scene(label):
     total_verts = sum(len(o.data.vertices) for o in meshes)
     total_faces = sum(len(o.data.polygons) for o in meshes)
     print(f"TOTAL_VERTICES={total_verts} TOTAL_FACES={total_faces}", flush=True)
+    from mathutils import Vector
+    points = [o.matrix_world @ Vector(corner) for o in meshes for corner in o.bound_box]
+    if points:
+        mins = [min(p[i] for p in points) for i in range(3)]
+        maxs = [max(p[i] for p in points) for i in range(3)]
+        print("WORLD_BOUNDS_MIN=" + str(tuple(round(float(v), 3) for v in mins)), flush=True)
+        print("WORLD_BOUNDS_MAX=" + str(tuple(round(float(v), 3) for v in maxs)), flush=True)
+        print("WORLD_BOUNDS_SIZE=" + str(tuple(round(float(maxs[i]-mins[i]), 3) for i in range(3))), flush=True)
     for o in objects:
         dims = tuple(round(float(v), 3) for v in o.dimensions)
         print(f"OBJECT name={o.name!r} type={o.type} dims={dims} "
@@ -64,8 +72,12 @@ with zipfile.ZipFile(__import__("io").BytesIO(nested_data)) as inner:
         if name.endswith("/"):
             continue
         target = model_root / Path(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(inner.read(name))
     fbx_path = model_root / Path(fbx_name)
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.fbx(filepath=str(fbx_path), use_image_search=True)
+if hasattr(bpy.ops.wm, "fbx_import"):
+    bpy.ops.wm.fbx_import(filepath=str(fbx_path), use_anim=False)
+else:
+    bpy.ops.import_scene.fbx(filepath=str(fbx_path), use_image_search=True, use_anim=False)
 inspect_scene("CLOCKTOWER FBX")
