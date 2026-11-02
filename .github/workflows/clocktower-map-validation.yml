@@ -120,8 +120,8 @@ jobs:
                   var aabb := mesh_instance.get_aabb()
                   for corner_index in range(8):
                       var point := mesh_instance.global_transform * aabb.get_endpoint(corner_index)
-                      min_point = min_point.min(point)
-                      max_point = max_point.max(point)
+                      min_point = Vector3(minf(min_point.x, point.x), minf(min_point.y, point.y), minf(min_point.z, point.z))
+                      max_point = Vector3(maxf(max_point.x, point.x), maxf(max_point.y, point.y), maxf(max_point.z, point.z))
                   for surface in range(mesh_instance.mesh.get_surface_count()):
                       var material := mesh_instance.get_active_material(surface)
                       if material is StandardMaterial3D and (material as StandardMaterial3D).albedo_texture != null:
