@@ -7,6 +7,10 @@ on:
       - "game/**"
   workflow_dispatch:
 
+concurrency:
+  group: freefire3d-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
