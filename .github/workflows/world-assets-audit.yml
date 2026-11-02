@@ -111,7 +111,9 @@ jobs:
                   for o in meshes:
                       corners=[o.matrix_world @ Vector(c) for c in o.bound_box]
                       points.extend(corners)
-                      objects.append({"name":o.name,"vertices":len(o.data.vertices),"triangles":sum(max(0,len(p.vertices)-2) for p in o.data.polygons),"materials":[m.name if m else None for m in o.data.materials]})
+                      obj_min=Vector([min(p[i] for p in corners) for i in range(3)])
+                      obj_max=Vector([max(p[i] for p in corners) for i in range(3)])
+                      objects.append({"name":o.name,"vertices":len(o.data.vertices),"triangles":sum(max(0,len(p.vertices)-2) for p in o.data.polygons),"bounds_min":list(obj_min),"bounds_max":list(obj_max),"dimensions":list(obj_max-obj_min),"center":list((obj_min+obj_max)*0.5),"materials":[m.name if m else None for m in o.data.materials]})
                   images=[]
                   for image in bpy.data.images:
                       if image.type=="IMAGE":
