@@ -22,7 +22,9 @@ func _ready() -> void:
 	add_to_group("damageable")
 	add_to_group("bots")
 	health = maximum_health
-	animation_player = model.find_child("*", true, false) as AnimationPlayer
+	var animation_nodes := model.find_children("*", "AnimationPlayer", true, false)
+	if not animation_nodes.is_empty():
+		animation_player = animation_nodes[0] as AnimationPlayer
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 25.0, global_position + Vector3.DOWN * 80.0)
