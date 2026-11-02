@@ -192,6 +192,23 @@ jobs:
           PY
           test -s game/assets/audio/footstep00.ogg
 
+      - name: Rig original Olivia model to the existing 86-clip humanoid skeleton
+        run: |
+          mkdir -p game/assets/characters build/olivia
+          python3 - <<'PY'
+          import zipfile, pathlib
+          archive=pathlib.Path("olivia-free-fire.zip")
+          with zipfile.ZipFile(archive) as z:
+              entry="source/olivia-free_fire.glb"
+              if entry not in z.namelist(): raise SystemExit("Olivia source GLB missing")
+              target=pathlib.Path("game/assets/characters/olivia_source.glb")
+              target.write_bytes(z.read(entry))
+              print("OLIVIA_SOURCE_EXTRACTED",entry,target.stat().st_size)
+          PY
+          /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/rig_olivia.py -- game/assets/characters/female_player_rigged.glb game/assets/characters/olivia_source.glb game/assets/characters/olivia_rigged.glb 2>&1 | tee build/olivia-rigging.log
+          grep "OLIVIA_RIG_OK" build/olivia-rigging.log
+          test -s game/assets/characters/olivia_rigged.glb
+
       - name: Prepare Android debug signing
         run: |
           mkdir -p "$HOME/.android"
@@ -201,6 +218,8 @@ jobs:
       - name: Import and validate Godot project
         run: |
           "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/olivia_rig_audit.gd 2>&1 | tee build/olivia-rig-godot-audit.log
+          grep "OLIVIA_RIG_GODOT_OK" build/olivia-rig-godot-audit.log
           "$GODOT_BIN" --headless --path game --script res://scripts/scale_audit.gd 2>&1 | tee build/scale-audit.log
           "$GODOT_BIN" --headless --path game --script res://scripts/weapon_asset_audit.gd 2>&1 | tee build/weapon-asset-audit.log
           grep "WEAPON_AUDIT_OK" build/weapon-asset-audit.log
