@@ -155,7 +155,7 @@ jobs:
                   for image in bpy.data.images:
                       if image.source != "FILE" or not image.filepath:
                           continue
-                      raw_path=bpy.path.abspath(image.filepath).replace("\\\\","/")
+                      raw_path=bpy.path.abspath(image.filepath).replace(chr(92),"/")
                       image_name=raw_path.split("/")[-1]
                       original=Path(raw_path)
                       if not original.is_file():
