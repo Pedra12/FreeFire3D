@@ -10,7 +10,7 @@ signal shot_fired(hit: bool)
 @export var reload_duration: float = 1.65
 @export var max_distance: float = 220.0
 @export var aim_fov: float = 48.0
-@export var normal_fov: float = 72.0
+@export var normal_fov: float = 65.0
 
 @onready var player: CharacterBody3D = get_parent() as CharacterBody3D
 @onready var camera: Camera3D = player.get_node("CameraPivot/Camera3D") as Camera3D
