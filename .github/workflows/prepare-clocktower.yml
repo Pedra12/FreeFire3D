@@ -33,5 +33,6 @@ jobs:
           git add Assets/Game/Maps/Clocktower/Clocktower.glb Assets/Game/Maps/Clocktower/AssetImportReport.json
           if ! git diff --cached --quiet; then
             git commit -m "Import single canonical Clocktower GLB"
-            git push
+            git pull --rebase origin unity-project
+            git push origin HEAD:unity-project
           fi
