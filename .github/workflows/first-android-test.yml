@@ -93,7 +93,8 @@ jobs:
       - name: Import and validate Godot project
         run: |
           "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
-          "$GODOT_BIN" --headless --path game --quit-after 3 2>&1 | tee build/godot-smoke-test.log
+          "$GODOT_BIN" --headless --path game --quit-after 5 2>&1 | tee build/godot-smoke-test.log
+          grep "BERMUDA_COLLISIONS generated=" build/godot-smoke-test.log
 
       - name: Export Android APK
         run: |
