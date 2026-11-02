@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/maps/bermuda_masterizado.glb" id="1_map"]
-[ext_resource type="Script" path="res://scripts/camera_orbit.gd" id="2_camera"]
-[ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="3_collisions"]
+[ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="2_collisions"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3_player"]
+[ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="4_hud"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -18,28 +19,16 @@ tonemap_mode = 2
 environment = SubResource("Environment_main")
 
 [node name="Map" parent="." instance=ExtResource("1_map")]
-script = ExtResource("3_collisions")
+script = ExtResource("2_collisions")
 
-[node name="CameraRig" type="Node3D" parent="."]
-script = ExtResource("2_camera")
+[node name="Player" parent="." instance=ExtResource("3_player")]
+position = Vector3(0, 5, 0)
 
-[node name="Camera3D" type="Camera3D" parent="CameraRig"]
-current = true
-fov = 68.0
+[node name="MobileHUD" type="CanvasLayer" parent="."]
+script = ExtResource("4_hud")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 rotation = Vector3(-0.82, -0.58, 0.0)
 light_energy = 1.15
 shadow_enabled = true
 directional_shadow_max_distance = 180.0
-
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
-
-[node name="Status" type="Label" parent="CanvasLayer"]
-offset_left = 28.0
-offset_top = 22.0
-offset_right = 760.0
-offset_bottom = 62.0
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 26
-text = "FREEFIRE 3D  |  BERMUDA MASTERIZADO"
