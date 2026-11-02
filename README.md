@@ -1,6 +1,6 @@
-# FreeFire3D Unity migration
+# FreeFire3D Unity project
 
-This folder is the new Unity project. The existing Godot implementation remains untouched on the `4v4-premium-prototype` branch.
+This repository branch is the standalone Unity project. The existing Godot implementation remains untouched on the separate `4v4-premium-prototype` branch.
 
 ## Target
 
@@ -25,6 +25,6 @@ Unity Editor version is pinned to 6000.0.23f1 in `ProjectSettings/ProjectVersion
 
 ## Current status
 
-- Migration branch created from the last Godot project commit.
+- Standalone Unity branch created without the legacy Godot project files in its working tree.
 - Unity project settings and initial TPS/mobile-input code are being established.
 - No Unity APK exists yet.
