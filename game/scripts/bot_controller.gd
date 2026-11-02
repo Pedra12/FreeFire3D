@@ -17,6 +17,7 @@ var animation_player: AnimationPlayer
 var attack_timer: float = 0.8
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 var current_animation: StringName = &""
+var action_animation_locked: bool = false
 
 func _ready() -> void:
 	add_to_group("damageable")
@@ -25,6 +26,8 @@ func _ready() -> void:
 	var animation_nodes := model.find_children("*", "AnimationPlayer", true, false)
 	if not animation_nodes.is_empty():
 		animation_player = animation_nodes[0] as AnimationPlayer
+	if animation_player != null:
+		animation_player.animation_finished.connect(_on_animation_finished)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 25.0, global_position + Vector3.DOWN * 80.0)
@@ -83,6 +86,7 @@ func _attack_player() -> void:
 		return
 	var health_node := player.get_node_or_null("Health")
 	if health_node != null and health_node.has_method("apply_damage"):
+		_play_action(&"Pistol_Shoot")
 		health_node.apply_damage(attack_damage)
 
 func apply_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO, _hit_normal: Vector3 = Vector3.UP) -> void:
@@ -92,8 +96,19 @@ func apply_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO, _hit_nor
 	if health <= 0.0:
 		queue_free()
 
+func _play_action(animation_name: StringName) -> void:
+	if animation_player == null or not animation_player.has_animation(animation_name):
+		return
+	action_animation_locked = true
+	current_animation = animation_name
+	animation_player.play(animation_name, 0.06)
+
+func _on_animation_finished(animation_name: StringName) -> void:
+	if action_animation_locked and animation_name == current_animation:
+		action_animation_locked = false
+
 func _play(names: Array[StringName]) -> void:
-	if animation_player == null:
+	if animation_player == null or action_animation_locked:
 		return
 	for name in names:
 		if animation_player.has_animation(name):
