@@ -1,0 +1,45 @@
+name: Inspect Quaternius Humanoid FBX
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "Assets/Game/Animations/Quaternius/UAL1_Standard.fbx"
+      - "Tools/inspect_quaternius_fbx.py"
+      - ".github/workflows/inspect-quaternius-fbx.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated Unity project
+        uses: actions/checkout@v4
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+      - name: Inspect animation FBX and verify core actions
+        run: blender --background --python Tools/inspect_quaternius_fbx.py
+      - name: Commit FBX inspection report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/Game/Animations/Quaternius/FBXInspectionReport.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Validate Quaternius FBX animation donor"
+            for attempt in 1 2 3; do
+              git fetch origin unity-project
+              git rebase origin/unity-project
+              if git push origin HEAD:unity-project; then
+                exit 0
+              fi
+              sleep $((attempt * 2))
+            done
+            exit 1
+          fi
