@@ -151,6 +151,38 @@ def main():
     if len(manifest["assets"]) < 3:
         raise SystemExit("Insufficient Poly Haven 2K materials downloaded")
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    # Generate a native Godot material resource so the 2K textures are packed
+    # into the Android export without relying on a runtime JSON manifest.
+    ground = manifest["assets"].get("ground")
+    if ground is None or "basecolor" not in ground["maps"]:
+        raise SystemExit("Ground PBR material is missing its base color map")
+    material_lines = [
+        '[gd_resource type="StandardMaterial3D" load_steps=1 format=3]',
+        ''
+    ]
+    resource_ids = {}
+    for map_name in ("basecolor", "normal", "roughness", "ao"):
+        map_info = ground["maps"].get(map_name)
+        if not map_info:
+            continue
+        relative = Path(map_info["file"]).as_posix()
+        if relative.startswith("game/"):
+            relative = "res://" + relative[5:]
+        resource_id = str(len(resource_ids) + 1)
+        resource_ids[map_name] = resource_id
+        material_lines.insert(-1, f'[ext_resource type="Texture2D" path="{relative}" id="{resource_id}"]')
+    material_lines[0] = f'[gd_resource type="StandardMaterial3D" load_steps={1 + len(resource_ids)} format=3]'
+    material_lines.extend(["[resource]", f'albedo_texture = ExtResource("{resource_ids["basecolor"]}")', "roughness = 0.92", "metallic = 0.0", "uv1_scale = Vector3(22, 22, 1)'])
+    if "normal" in resource_ids:
+        material_lines.extend(["normal_enabled = true", f'normal_texture = ExtResource("{resource_ids["normal"]}")', "normal_scale = 0.72"])
+    if "roughness" in resource_ids:
+        material_lines.append(f'roughness_texture = ExtResource("{resource_ids["roughness"]}")')
+    if "ao" in resource_ids:
+        material_lines.extend(["ao_enabled = true", f'ao_texture = ExtResource("{resource_ids["ao"]}")'])
+    (OUT / "ground_material.tres").write_text("\\n".join(material_lines) + "\\n", encoding="utf-8")
+    print("GODOT_GROUND_MATERIAL_OK", str(OUT / "ground_material.tres"), "maps", ",".join(resource_ids))
+
     (OUT / "ASSET_CREDITS.txt").write_text(
         "PBR texture materials downloaded from Poly Haven. License: CC0. "
         "Source: https://polyhaven.com/ and https://api.polyhaven.com/\n",
