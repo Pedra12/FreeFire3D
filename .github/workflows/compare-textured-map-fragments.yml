@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Blender and archive tools
-        run: sudo apt-get update && sudo apt-get install -y blender unzip
+        run: sudo apt-get update && sudo apt-get install -y blender unzip libegl1
       - name: Recursively extract source models
         run: |
           mkdir -p /tmp/compare/full /tmp/compare/fragment audit
@@ -52,7 +52,11 @@ jobs:
           objs=list((root/'fragment').rglob('*.obj'))
           obj=max(objs,key=lambda p:p.stat().st_size)
           mtls=list((root/'fragment').rglob('*.mtl'))
-          mtl=next((p for p in mtls if p.stem==obj.stem),mtls[0] if mtls else None)
+          obj_text=obj.read_text(errors='ignore')
+          mtl_name=next((line.split(maxsplit=1)[1].strip().strip('"') for line in obj_text.splitlines() if line.lower().startswith('mtllib ')),None)
+          mtl=next((p for p in mtls if p.name==pathlib.Path(mtl_name).name),None) if mtl_name else None
+          if mtl is None: mtl=next((p for p in mtls if p.stem==obj.stem),mtls[0] if mtls else None)
+          print('OBJ material library:',mtl,'all MTLs:',[str(p) for p in mtls])
           # Repair the OBJ material library's stale absolute texture paths by copying
           # the archive's texture files beside the OBJ using their original names.
           model_dir=obj.parent
@@ -61,6 +65,10 @@ jobs:
               target=model_dir/tex.name
               if not target.exists(): target.write_bytes(tex.read_bytes())
           if mtl and mtl.exists():
+            # Place the MTL beside the OBJ under the exact library filename expected by OBJ.
+            expected_mtl=obj.parent/pathlib.Path(mtl_name).name if mtl_name else obj.with_suffix('.mtl')
+            if expected_mtl != mtl: expected_mtl.write_bytes(mtl.read_bytes())
+            mtl=expected_mtl
             lines=[]
             for line in mtl.read_text(errors='ignore').splitlines():
               if line.lower().startswith(('map_kd ','map_ka ','map_ks ','map_bump ','bump ')):
