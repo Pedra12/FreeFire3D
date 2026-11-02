@@ -27,10 +27,10 @@ jobs:
             with zipfile.ZipFile(io.BytesIO(raw)) as z:
               for info in z.infolist():
                 if info.is_dir(): continue
-                data=z.read(info)
+                data=z.read(info.filename)
                 name=pathlib.Path(info.filename)
                 if name.suffix.lower()=='.zip':
-                  extract(data,dest/(name.stem),depth+1)
+                  extract(data,dest/name.stem,depth+1)
                 else:
                   out=dest/name
                   out.parent.mkdir(parents=True,exist_ok=True)
@@ -38,107 +38,95 @@ jobs:
           extract(pathlib.Path('free-fire-ful-map.zip').read_bytes(),pathlib.Path('/tmp/compare/full'))
           extract(pathlib.Path('free-fire-burmuda-map-the-circuit-3d-model.zip').read_bytes(),pathlib.Path('/tmp/compare/fragment'))
           PY
-          echo "OBJ files:"; find /tmp/compare/fragment -type f -iname '*.obj'
-          echo "MTL files:"; find /tmp/compare/fragment -type f -iname '*.mtl'
-          echo "Textures:"; find /tmp/compare/fragment -type f -iname '*.png' | wc -l
-          test -n "$(find /tmp/compare/fragment -type f -iname '*.obj' -print -quit)"
-      - name: Compare geometry, bounds and render previews
+      - name: Render textured models and compare landmarks
         run: |
-          cat > /tmp/compare.py <<'PY'
+          cat > /tmp/textured.py <<'PY'
           import bpy, pathlib, json, math
           from mathutils import Vector
           root=pathlib.Path('/tmp/compare')
           blend=next((root/'full').rglob('*.blend'))
-          objs=list((root/'fragment').rglob('*.obj'))
-          obj=max(objs,key=lambda p:p.stat().st_size)
+          obj=max((root/'fragment').rglob('*.obj'),key=lambda p:p.stat().st_size)
+          mtl_name=next((line.split(maxsplit=1)[1].strip().strip('"') for line in obj.read_text(errors='ignore').splitlines() if line.lower().startswith('mtllib ')),None)
           mtls=list((root/'fragment').rglob('*.mtl'))
-          obj_text=obj.read_text(errors='ignore')
-          mtl_name=next((line.split(maxsplit=1)[1].strip().strip('"') for line in obj_text.splitlines() if line.lower().startswith('mtllib ')),None)
-          mtl=next((p for p in mtls if p.name==pathlib.Path(mtl_name).name),None) if mtl_name else None
-          if mtl is None: mtl=next((p for p in mtls if p.stem==obj.stem),mtls[0] if mtls else None)
-          print('OBJ material library:',mtl,'all MTLs:',[str(p) for p in mtls])
-          # Repair the OBJ material library's stale absolute texture paths by copying
-          # the archive's texture files beside the OBJ using their original names.
-          model_dir=obj.parent
-          for tex in (root/'fragment').rglob('*'):
-            if tex.is_file() and tex.suffix.lower() in ('.png','.jpg','.jpeg','.tga') and tex.parent != model_dir:
-              target=model_dir/tex.name
-              if not target.exists(): target.write_bytes(tex.read_bytes())
-          if mtl and mtl.exists():
-            # Place the MTL beside the OBJ under the exact library filename expected by OBJ.
-            expected_mtl=obj.parent/pathlib.Path(mtl_name).name if mtl_name else obj.with_suffix('.mtl')
-            if expected_mtl != mtl: expected_mtl.write_bytes(mtl.read_bytes())
-            mtl=expected_mtl
+          mtl=next((p for p in mtls if mtl_name and p.name==pathlib.Path(mtl_name).name),None)
+          if mtl:
+            model_dir=obj.parent
+            for tex in (root/'fragment').rglob('*'):
+              if tex.is_file() and tex.suffix.lower() in ('.png','.jpg','.jpeg','.tga'):
+                target=model_dir/tex.name
+                if not target.exists(): target.write_bytes(tex.read_bytes())
+            expected=obj.parent/pathlib.Path(mtl_name).name
+            if expected!=mtl: expected.write_bytes(mtl.read_bytes())
             lines=[]
-            for line in mtl.read_text(errors='ignore').splitlines():
+            for line in expected.read_text(errors='ignore').splitlines():
               if line.lower().startswith(('map_kd ','map_ka ','map_ks ','map_bump ','bump ')):
                 parts=line.split()
                 if len(parts)>1: line=parts[0]+' '+pathlib.Path(parts[-1]).name
               lines.append(line)
-            mtl.write_text('\\n'.join(lines)+'\\n')
+            expected.write_text('\\n'.join(lines)+'\\n')
+          def import_obj():
+            if hasattr(bpy.ops.wm,'obj_import'): bpy.ops.wm.obj_import(filepath=str(obj))
+            else: bpy.ops.import_scene.obj(filepath=str(obj))
+          def setup_camera(scene,center,span,path):
+            camdata=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',camdata); scene.collection.objects.link(cam)
+            cam.location=(center.x,center.y,center.z+span*2.0); cam.rotation_euler=(0,0,0)
+            cam.data.type='ORTHO'; cam.data.ortho_scale=span; scene.camera=cam
+            scene.render.engine='BLENDER_WORKBENCH'
+            scene.display.shading.light='STUDIO'
+            scene.display.shading.color_type='MATERIAL'
+            scene.display.shading.show_shadows=True
+            scene.display.shading.show_cavity=True
+            scene.render.resolution_x=1500; scene.render.resolution_y=1200; scene.render.resolution_percentage=100
+            scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(path)
+            bpy.ops.render.render(write_still=True)
+          # Render complete white-map source as delivered, preserving all original materials.
           bpy.ops.wm.open_mainfile(filepath=str(blend))
           full=[o for o in bpy.context.scene.objects if o.type=='MESH']
           def bounds(objects):
-            pts=[]
-            for o in objects:
-              for c in o.bound_box: pts.append(o.matrix_world @ Vector(c))
-            if not pts: return None
+            pts=[o.matrix_world @ Vector(c) for o in objects for c in o.bound_box]
             return {'min':[min(p[i] for p in pts) for i in range(3)],'max':[max(p[i] for p in pts) for i in range(3)]}
           fb=bounds(full)
-          if hasattr(bpy.ops.wm,'obj_import'): bpy.ops.wm.obj_import(filepath=str(obj))
-          else: bpy.ops.import_scene.obj(filepath=str(obj))
-          frag=[o for o in bpy.context.scene.objects if o.type=='MESH' and o not in full]
-          mb=bounds(frag)
-          def dims(b): return [round(b['max'][i]-b['min'][i],3) for i in range(3)]
-          report={'full_map_file':str(blend),'fragment_obj':str(obj),'fragment_mtl':str(mtl) if mtl else None,'obj_candidates':[(str(p),p.stat().st_size) for p in objs],'full_meshes':len(full),'fragment_meshes':len(frag),'full_bounds':fb,'fragment_bounds':mb,'full_dimensions':dims(fb),'fragment_dimensions':dims(mb),'same_coordinate_overlap':None,'texture_count':len(list((root/'fragment').rglob('*.png')))}
-          if fb and mb:
-            report['same_coordinate_overlap']=[round(max(0,min(fb['max'][i],mb['max'][i])-max(fb['min'][i],mb['min'][i])),3) for i in range(3)]
-            report['fragment_center']=[round((mb['min'][i]+mb['max'][i])/2,3) for i in range(3)]
-            report['full_center']=[round((fb['min'][i]+fb['max'][i])/2,3) for i in range(3)]
-          def object_rows(objects):
-            rows=[]
-            for o in objects:
-              b=bounds([o])
-              rows.append({'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'bounds':b,'dimensions':dims(b)})
-            return rows
-          report['full_objects']=object_rows(full)
-          report['fragment_objects']=object_rows(frag)
-          pathlib.Path('audit/geometry-comparison.json').write_text(json.dumps(report,indent=2))
-          for o in full:
-            mat=bpy.data.materials.new('FullMapNeutral'); mat.diffuse_color=(0.62,0.66,0.68,1); o.data.materials.clear(); o.data.materials.append(mat)
-          for o in frag:
-            mat=bpy.data.materials.new('FragmentNeutral'); mat.diffuse_color=(0.18,0.42,0.2,1); o.data.materials.clear(); o.data.materials.append(mat)
+          fc=Vector([(fb['min'][i]+fb['max'][i])/2 for i in range(3)])
+          fs=max(fb['max'][0]-fb['min'][0],fb['max'][1]-fb['min'][1])*1.18
           scene=bpy.context.scene
-          scene.render.engine='BLENDER_WORKBENCH'
-          scene.display.shading.light='STUDIO'
-          scene.display.shading.color_type='MATERIAL'
-          scene.display.shading.show_shadows=True
-          scene.display.shading.show_cavity=True
-          scene.render.resolution_x=1400; scene.render.resolution_y=1100; scene.render.resolution_percentage=100
-          allb=[fb,mb]; mn=[min(b['min'][i] for b in allb) for i in range(3)]; mx=[max(b['max'][i] for b in allb) for i in range(3)]
-          center=Vector([(mn[i]+mx[i])/2 for i in range(3)])
-          span=max(mx[0]-mn[0],mx[1]-mn[1])*1.15
-          camdata=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',camdata); scene.collection.objects.link(cam)
-          cam.location=(center.x,center.y,mx[2]+max(100,span)); cam.rotation_euler=(0,0,0); cam.data.type='ORTHO'; cam.data.ortho_scale=span; scene.camera=cam
-          for o in scene.objects:
-            if o.type=='LIGHT': o.hide_render=True
-          bpy.ops.object.light_add(type='AREA', location=(center.x,center.y,mx[2]+span))
-          light=bpy.context.object; light.data.energy=5000; light.data.shape='DISK'; light.data.size=span
-          scene.render.image_settings.file_format='PNG'
-          scene.render.filepath='audit/fragment-overlay-top.png'
-          bpy.ops.render.render(write_still=True)
-          cam.location=(center.x,mn[1]-span*1.8,center.z); cam.rotation_euler=(math.radians(90),0,0)
-          cam.data.ortho_scale=max(mx[0]-mn[0],mx[2]-mn[2])*1.25
-          scene.render.resolution_y=900; scene.render.filepath='audit/fragment-overlay-side.png'
-          bpy.ops.render.render(write_still=True)
+          setup_camera(scene,fc,fs,'audit/full-map-textured-source.png')
+          # Render candidate textured fragment using the same coordinates and scale.
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          import_obj()
+          frag=[o for o in bpy.context.scene.objects if o.type=='MESH']
+          # Ignore the giant backdrop/wall plane and retain map content inside full-map footprint.
+          for o in frag:
+            if o.name.startswith('Plane.003_Plane'): o.hide_render=True
+          scene=bpy.context.scene
+          setup_camera(scene,fc,fs,'audit/fragment-textured-source.png')
+          # Also render a combined overlay with full map in neutral translucent grey and fragment in its native materials.
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          bpy.ops.wm.open_mainfile(filepath=str(blend))
+          full=[o for o in bpy.context.scene.objects if o.type=='MESH']
+          for o in full:
+            mat=bpy.data.materials.new('BaseMapNeutral')
+            mat.diffuse_color=(0.55,0.58,0.62,0.35)
+            mat.surface_render_method='DITHERED'
+            o.data.materials.clear(); o.data.materials.append(mat)
+          import_obj()
+          frag=[o for o in bpy.context.scene.objects if o.type=='MESH' and o not in full]
+          for o in frag:
+            if o.name.startswith('Plane.003_Plane'): o.hide_render=True
+          scene=bpy.context.scene
+          setup_camera(scene,fc,fs,'audit/combined-textured-overlay.png')
+          report={'full_map_bounds':fb,'full_map_dimensions':[round(fb['max'][i]-fb['min'][i],3) for i in range(3)],'fragment_meshes':len(frag),'fragment_textured_materials':sum(1 for m in bpy.data.materials if m.use_nodes and any(n.type=='TEX_IMAGE' for n in m.node_tree.nodes)),'fragment_mesh_bounds':[]}
+          for o in frag:
+            b=bounds([o])
+            report['fragment_mesh_bounds'].append({'name':o.name,'vertices':len(o.data.vertices),'bounds':b})
+          pathlib.Path('audit/textured-comparison.json').write_text(json.dumps(report,indent=2))
           print(json.dumps(report,indent=2))
           PY
-          blender -b --python /tmp/compare.py
-      - name: Upload comparison report and previews
+          blender -b --python /tmp/textured.py
+      - name: Upload textured comparison
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: FreeFire3D-textured-map-fragment-comparison
+          name: FreeFire3D-textured-landmark-comparison
           path: audit/
           if-no-files-found: error
           retention-days: 14
