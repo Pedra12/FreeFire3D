@@ -63,9 +63,9 @@ with zipfile.ZipFile(__import__("io").BytesIO(nested_data)) as inner:
     for name in inner.namelist():
         if name.endswith("/"):
             continue
-        target = model_root / Path(name).name
+        target = model_root / Path(name)
         target.write_bytes(inner.read(name))
-    fbx_path = model_root / Path(fbx_name).name
+    fbx_path = model_root / Path(fbx_name)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.fbx(filepath=str(fbx_path), use_image_search=True)
 inspect_scene("CLOCKTOWER FBX")
