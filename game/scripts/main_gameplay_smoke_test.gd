@@ -23,9 +23,15 @@ func _run_test() -> void:
 
 	var player := scene.get_node("Player")
 	var health := player.get_node_or_null("Health")
+	var weapon_mount := player.get_node_or_null("WeaponMount")
 	var hud := scene.get_node_or_null("MobileHUD")
-	if health == null or hud == null:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: player health or HUD missing")
+	if health == null or hud == null or weapon_mount == null:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: player health, weapon mount or HUD missing")
+		quit(1)
+		return
+
+	if weapon_mount.get("mounted_weapon") == null:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: player AWM not attached to hand")
 		quit(1)
 		return
 
@@ -38,5 +44,15 @@ func _run_test() -> void:
 		quit(1)
 		return
 
-	print("MAIN_GAMEPLAY_TEST_OK: bots=", bots.size(), " player_health=", hud_health, " bot_attack_verified=", hud_health < 90.0)
+	var bot_weapons := 0
+	for bot in bots:
+		var bot_mount := bot.get_node_or_null("WeaponMount")
+		if bot_mount != null and bot_mount.get("mounted_weapon") != null:
+			bot_weapons += 1
+	if bot_weapons != bots.size():
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: weapon mounts on bots %d/%d" % [bot_weapons, bots.size()])
+		quit(1)
+		return
+
+	print("MAIN_GAMEPLAY_TEST_OK: bots=", bots.size(), " player_health=", hud_health, " bot_attack_verified=", hud_health < 90.0, " weapons=", bot_weapons + 1)
 	quit(0)
