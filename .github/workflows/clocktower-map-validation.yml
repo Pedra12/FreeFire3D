@@ -150,30 +150,32 @@ jobs:
               await physics_frame
               await physics_frame
               var space := test_root.get_world_3d().direct_space_state
-              var samples := [
-                  Vector3(0.0, 100.0, 0.0),
-                  Vector3(-27.0, 100.0, -12.0),
-                  Vector3(25.0, 100.0, -4.0),
-                  Vector3(-17.0, 100.0, 7.0),
-                  Vector3(39.0, 100.0, 3.0),
-                  Vector3(-5.0, 100.0, -33.0),
-                  Vector3(-6.0, 100.0, 26.0)
+              var interior_samples := [
+                  {"from": Vector3(-27.0, 2.5, -12.0), "to": Vector3(-27.0, -2.0, -12.0), "name": "house_medium_b"},
+                  {"from": Vector3(25.0, 1.5, -4.0), "to": Vector3(25.0, -3.0, -4.0), "name": "house_medium_a"},
+                  {"from": Vector3(-17.0, 5.5, 7.0), "to": Vector3(-17.0, 1.0, 7.0), "name": "house_huge_a"},
+                  {"from": Vector3(39.0, 2.5, 3.0), "to": Vector3(39.0, -3.0, 3.0), "name": "house_big_b"},
+                  {"from": Vector3(-5.0, 1.5, -33.0), "to": Vector3(-5.0, -3.0, -33.0), "name": "mansion"},
+                  {"from": Vector3(-6.0, 5.5, 26.0), "to": Vector3(-6.0, 1.0, 26.0), "name": "clock_tower"}
               ]
-              var hit_count := 0
-              var heights: Array[float] = []
-              for sample in samples:
-                  var query := PhysicsRayQueryParameters3D.create(sample, Vector3(sample.x, -20.0, sample.z))
+              var interior_hits := 0
+              var floor_heights: Array[float] = []
+              for sample in interior_samples:
+                  var query := PhysicsRayQueryParameters3D.create(sample["from"], sample["to"])
                   var hit := space.intersect_ray(query)
                   if not hit.is_empty():
-                      hit_count += 1
-                      heights.append(float(hit.position.y))
-              print("CLOCKTOWER_FLOOR_RAYS hits=", hit_count, "/", samples.size(), " heights=", heights)
-              if hit_count < 4:
-                  push_error("CLOCKTOWER_AUDIT_FAILED: ground and building collision coverage too low")
+                      interior_hits += 1
+                      floor_heights.append(float(hit.position.y))
+                      print("CLOCKTOWER_INTERIOR_HIT ", sample["name"], " y=", hit.position.y)
+                  else:
+                      print("CLOCKTOWER_INTERIOR_MISS ", sample["name"])
+              print("CLOCKTOWER_INTERIOR_FLOORS hits=", interior_hits, "/", interior_samples.size(), " heights=", floor_heights)
+              if interior_hits < 4:
+                  push_error("CLOCKTOWER_AUDIT_FAILED: fewer than four accessible house/tower interior floors")
                   quit(5)
                   return
               print("CLOCKTOWER_MAP_AUDIT_OK: meshes=", meshes.size(), " textures=", textured_surfaces,
-                  " colliders=", collider_count, " floor_hits=", hit_count)
+                  " colliders=", collider_count, " interior_floors=", interior_hits)
               quit(0)
           GDSCRIPT
           "$GODOT_BIN" --headless --path game --script res://scripts/clocktower_map_audit.gd 2>&1 | tee build/clocktower/map-audit.log
