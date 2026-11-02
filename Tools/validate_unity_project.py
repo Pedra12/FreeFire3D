@@ -41,6 +41,10 @@ required_files = [
     "Assets/Scripts/Input/TouchLookArea.cs",
     "Assets/Scripts/Input/MobileActionButton.cs",
     "Assets/Scripts/Match/MatchConfiguration.cs",
+    "Assets/Scripts/Match/MatchRuntimeSettings.cs",
+    "Assets/Scripts/World/ClocktowerCollisionAuthoring.cs",
+    "Assets/Editor/OliviaModelPostprocessor.cs",
+    "Assets/Editor/InitialMatchSceneBuilder.cs",
     "Assets/Documentation/CONTENT_SELECTION.md",
 ]
 for relative in required_files:
