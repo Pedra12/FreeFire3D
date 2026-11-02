@@ -71,7 +71,7 @@ func _run_test() -> void:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: player AWM not attached to hand")
 		quit(1)
 		return
-	if int(inventory.get("ammo_sniper")) != 20 or int(inventory.get("ammo_556")) != 120 or int(inventory.get("ammo_9mm")) != 90 or int(inventory.get("ammo_12g")) != 24 or int(inventory.get("medkits")) != 2 or int(inventory.get("grenades")) != 1:
+	if int(inventory.get("ammo_sniper")) != 20 or int(inventory.get("ammo_556")) != 60 or int(inventory.get("ammo_9mm")) != 45 or int(inventory.get("ammo_12g")) != 12 or int(inventory.get("medkits")) != 2 or int(inventory.get("grenades")) != 1:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: inventory starting loadout invalid")
 		quit(1)
 		return
@@ -103,6 +103,32 @@ func _run_test() -> void:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: expected 4 weapon loot models, found %d" % weapon_loot_count)
 		quit(1)
 		return
+
+	var ammo_pickup: Node = null
+	var rifle_pickup: Node = null
+	for loot in loot_nodes:
+		if loot.get("item_type") == &"ammo_556":
+			ammo_pickup = loot
+		if loot.get("item_type") == &"weapon_assault_rifle":
+			rifle_pickup = loot
+	if ammo_pickup == null or rifle_pickup == null:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: ammo or rifle pickup missing")
+		quit(1)
+		return
+	var ammo_before := int(inventory.get("ammo_556"))
+	ammo_pickup.call("_on_body_entered", player)
+	if int(inventory.get("ammo_556")) != ammo_before + 30:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: 5.56 pickup did not add matching ammunition")
+		quit(1)
+		return
+	var combat := player.get_node_or_null("CombatController")
+	rifle_pickup.call("_on_body_entered", player)
+	await create_timer(0.15).timeout
+	if combat == null or combat.get("current_weapon_id") != &"assault_rifle" or weapon_mount.get("current_weapon_id") != &"assault_rifle" or weapon_mount.get("mounted_weapon") == null:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: rifle pickup did not equip model and combat profile")
+		quit(1)
+		return
+	print("LOOT_PICKUP_TEST_OK: rifle model equipped and 5.56 ammo collected")
 
 	var allied_bot: Node = null
 	var enemy_bot: Node = null
