@@ -88,12 +88,7 @@ jobs:
           [rendering]
           renderer/rendering_method="gl_compatibility"
           EOF
-          cp game/inspect_olivia_audit.gd build/olivia-godot/inspect_olivia_audit.gd
-          sed -i 's#res://assets/characters/olivia.glb#res://assets/characters/olivia.glb#' build/olivia-godot/inspect_olivia_audit.gd
-          "$GODOT_BIN" --headless --editor --path build/olivia-godot --quit 2>&1 | tee build/import.log
-          "$GODOT_BIN" --headless --path build/olivia-godot --script res://inspect_olivia_audit.gd 2>&1 | tee build/olivia-rig-report.log
-          grep "OLIVIA_RIG_REPORT=" build/olivia-rig-report.log
-          cat > game/inspect_olivia_audit.gd <<'GD'
+          cat > build/olivia-godot/inspect_olivia_audit.gd <<'GD'
           extends SceneTree
           func _initialize():
               var packed = load("res://assets/characters/olivia.glb") as PackedScene
@@ -101,9 +96,9 @@ jobs:
                   push_error("OLIVIA_LOAD_FAILED")
                   quit(2)
                   return
-              var root = packed.instantiate()
-              var report = {"loaded": true, "nodes": 0, "meshes": 0, "skeletons": [], "animation_players": [], "animation_libraries": []}
-              _walk(root, report)
+              var model = packed.instantiate()
+              var report = {"loaded": true, "nodes": 0, "meshes": 0, "vertices": 0, "surfaces": 0, "skinned_meshes": 0, "skeletons": [], "animation_players": [], "animation_trees": 0}
+              _walk(model, report)
               print("OLIVIA_RIG_REPORT=", JSON.stringify(report))
               if report["meshes"] == 0:
                   push_error("OLIVIA_HAS_NO_MESHES")
@@ -113,9 +108,20 @@ jobs:
           func _walk(node: Node, report: Dictionary):
               report["nodes"] += 1
               if node is MeshInstance3D:
+                  var mesh_node = node as MeshInstance3D
                   report["meshes"] += 1
+                  if mesh_node.mesh:
+                      report["surfaces"] += mesh_node.mesh.get_surface_count()
+                      for surface in range(mesh_node.mesh.get_surface_count()):
+                          var arrays = mesh_node.mesh.surface_get_arrays(surface)
+                          if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
+                              report["vertices"] += arrays[Mesh.ARRAY_VERTEX].size()
+                  if mesh_node.skin != null:
+                      report["skinned_meshes"] += 1
               if node is Skeleton3D:
                   report["skeletons"].append({"name":node.name,"bones":node.get_bone_count()})
+              if node is AnimationTree:
+                  report["animation_trees"] += 1
               if node is AnimationPlayer:
                   var ap = node as AnimationPlayer
                   var anims = []
@@ -126,7 +132,8 @@ jobs:
               for child in node.get_children():
                   _walk(child, report)
           GD
-          "$GODOT_BIN" --headless --path game --script res://inspect_olivia_audit.gd 2>&1 | tee build/olivia-rig-report.log
+          "$GODOT_BIN" --headless --editor --path build/olivia-godot --quit 2>&1 | tee build/import.log
+          "$GODOT_BIN" --headless --path build/olivia-godot --script res://inspect_olivia_audit.gd 2>&1 | tee build/olivia-rig-report.log
           grep "OLIVIA_RIG_REPORT=" build/olivia-rig-report.log
       - name: Upload Olivia rig audit
         uses: actions/upload-artifact@v4
