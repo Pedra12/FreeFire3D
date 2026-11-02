@@ -20,7 +20,21 @@ if actual_hash != source_report.get("fbx_sha256"):
     raise SystemExit("Quaternius FBX hash does not match the downloaded source manifest.")
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.fbx(filepath=str(FBX), use_anim=True, use_custom_normals=True)
+fbx_importer = bpy.ops.import_scene.fbx
+fbx_import_properties = {
+    prop.identifier for prop in fbx_importer.get_rna_type().properties
+}
+fbx_import_args = {
+    "filepath": str(FBX),
+    "use_anim": True,
+    "use_custom_normals": True,
+}
+fbx_import_args = {
+    key: value for key, value in fbx_import_args.items()
+    if key in fbx_import_properties
+}
+print("FBX_IMPORT_PROPERTIES=" + ",".join(sorted(fbx_import_properties)), flush=True)
+fbx_importer(**fbx_import_args)
 
 armatures = [obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"]
 meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
