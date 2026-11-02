@@ -134,7 +134,12 @@ for mesh_obj in olivia_meshes:
         fallback_meshes += 1
     bound_meshes += 1
 
-# Keep only the armature and Olivia's seven skinned meshes.
+# Detach the armature from any GLB container while preserving its world transform.
+armature_world = armature.matrix_world.copy()
+armature.parent = None
+armature.matrix_world = armature_world
+
+# Keep only the armature and Olivia's skinned meshes.
 for obj in list(bpy.context.scene.objects):
     if obj != armature and obj not in olivia_meshes:
         bpy.data.objects.remove(obj, do_unlink=True)
