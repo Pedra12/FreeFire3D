@@ -1,4 +1,4 @@
-name: FreeFire3D Android player prototype
+name: FreeFire3D Bermuda Survival Android
 
 on:
   push:
@@ -6,6 +6,10 @@ on:
       - ".github/workflows/first-android-test.yml"
       - "game/**"
   workflow_dispatch:
+
+concurrency:
+  group: freefire3d-android-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -119,6 +123,23 @@ jobs:
           rm -f game/assets/characters/Superhero_Male_FullBody.bin
           sha256sum game/assets/characters/female_player_rigged.glb | tee build/female-player-sha256.txt
 
+      - name: Extract AWM weapon model
+        run: |
+          mkdir -p game/assets/weapons build
+          python3 - <<'PY'
+          import zipfile, pathlib, hashlib
+          archive=pathlib.Path("awm-free-fire.zip")
+          with zipfile.ZipFile(archive) as z:
+              matches=[n for n in z.namelist() if n.lower().endswith("awm_free_fire.glb")]
+              if len(matches)!=1:
+                  raise SystemExit(f"Expected one AWM GLB, found: {matches}")
+              data=z.read(matches[0])
+          target=pathlib.Path("game/assets/weapons/awm_free_fire.glb")
+          target.write_bytes(data)
+          print("AWM_EXTRACTED",matches[0],"bytes",len(data),"sha256",hashlib.sha256(data).hexdigest())
+          PY
+          test -s game/assets/weapons/awm_free_fire.glb
+
       - name: Prepare Android debug signing
         run: |
           mkdir -p "$HOME/.android"
@@ -129,25 +150,35 @@ jobs:
         run: |
           "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
           "$GODOT_BIN" --headless --path game --script res://scripts/scale_audit.gd 2>&1 | tee build/scale-audit.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/weapon_asset_audit.gd 2>&1 | tee build/weapon-asset-audit.log
+          grep "WEAPON_AUDIT_OK" build/weapon-asset-audit.log
+          grep "WEAPON_MOUNT_OK" build/weapon-asset-audit.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/combat_smoke_test.gd 2>&1 | tee build/combat-smoke-test.log
+          grep "COMBAT_TEST_OK" build/combat-smoke-test.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/main_gameplay_smoke_test.gd 2>&1 | tee build/main-gameplay-smoke-test.log
+          grep "MAIN_GAMEPLAY_TEST_OK" build/main-gameplay-smoke-test.log
+          grep "WEAPON_MOUNT_OK" build/main-gameplay-smoke-test.log
           "$GODOT_BIN" --headless --path game --quit-after 8 2>&1 | tee build/godot-smoke-test.log
           grep "BERMUDA_COLLISIONS generated=" build/godot-smoke-test.log
-          grep -E "ERROR:|SCRIPT ERROR:" build/godot-import.log build/godot-smoke-test.log && exit 1 || true
+          if grep -E "ERROR:|SCRIPT ERROR:" build/godot-import.log build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log; then exit 1; fi
 
       - name: Export Android APK
         run: |
           mkdir -p build
-          "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-Player-Prototype.apk" 2>&1 | tee build/android-export.log
-          test -s build/FreeFire3D-Player-Prototype.apk
-          unzip -t build/FreeFire3D-Player-Prototype.apk
-          "$ANDROID_HOME/build-tools/36.1.0/aapt" dump badging build/FreeFire3D-Player-Prototype.apk | tee build/apk-badging.txt
-          unzip -l build/FreeFire3D-Player-Prototype.apk | grep -E 'lib/arm64-v8a/.*\.so' | tee build/apk-native-libraries.txt
-          sha256sum build/FreeFire3D-Player-Prototype.apk | tee build/apk-sha256.txt
+          "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-Bermuda-Survival.apk" 2>&1 | tee build/android-export.log
+          test -s build/FreeFire3D-Bermuda-Survival.apk
+          unzip -t build/FreeFire3D-Bermuda-Survival.apk
+          AAPT_BIN="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$AAPT_BIN"
+          "$AAPT_BIN" dump badging build/FreeFire3D-Bermuda-Survival.apk | tee build/apk-badging.txt
+          unzip -l build/FreeFire3D-Bermuda-Survival.apk | grep -E 'lib/arm64-v8a/.*\.so' | tee build/apk-native-libraries.txt
+          sha256sum build/FreeFire3D-Bermuda-Survival.apk | tee build/apk-sha256.txt
 
       - name: Upload Android player prototype and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: FreeFire3D-Player-Prototype-APK
+          name: FreeFire3D-Bermuda-Survival-APK
           path: build/
           if-no-files-found: warn
           retention-days: 14

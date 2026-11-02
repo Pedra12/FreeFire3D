@@ -1,7 +1,8 @@
 config_version=5
 
 [application]
-config/name="FreeFire3D - Bermuda Masterizado"
+config/name="FreeFire3D - Bermuda Survival"
+config/icon="res://icon.svg"
 run/main_scene="res://scenes/main.tscn"
 
 [display]
