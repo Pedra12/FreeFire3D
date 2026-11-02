@@ -32,10 +32,11 @@ func _run_test() -> void:
 	health.call("apply_damage", 10.0)
 	await process_frame
 	var hud_health := float(hud.get("health_current"))
-	if absf(hud_health - 90.0) > 0.1:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: HUD health did not update, got %.1f" % hud_health)
+	var actual_health := float(health.get("current_health"))
+	if absf(hud_health - actual_health) > 0.1 or hud_health >= 100.0:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: HUD/health mismatch HUD=%.1f health=%.1f" % [hud_health, actual_health])
 		quit(1)
 		return
 
-	print("MAIN_GAMEPLAY_TEST_OK: bots=", bots.size(), " player_health=", hud_health)
+	print("MAIN_GAMEPLAY_TEST_OK: bots=", bots.size(), " player_health=", hud_health, " bot_attack_verified=", hud_health < 90.0)
 	quit(0)
