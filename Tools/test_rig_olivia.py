@@ -20,11 +20,11 @@ from mathutils import Vector
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = ROOT / "SourceArchives/olivia-free-fire.zip"
 OUT_DIR = ROOT / "Assets/Game/Characters/Olivia"
-OUT_FBX = OUT_DIR / "Olivia.fbx"
+OUT_GLB = OUT_DIR / "Olivia.glb"
 REPORT_FILE = OUT_DIR / "OliviaRigReport.json"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-if OUT_FBX.exists():
+if OUT_GLB.exists():
     old_report = {}
     if REPORT_FILE.exists():
         try:
@@ -32,64 +32,67 @@ if OUT_FBX.exists():
         except Exception:
             pass
     if old_report.get("rigging_method") == "manual_segment_distance_weights_v1":
-        OUT_FBX.unlink()
+        OUT_GLB.unlink()
         REPORT_FILE.unlink(missing_ok=True)
     else:
         raise SystemExit("Refusing to overwrite an unrecognized Olivia model.")
 other_models = [p for p in OUT_DIR.rglob("*") if p.is_file()
                 and p.suffix.lower() in {".glb", ".gltf", ".fbx", ".obj", ".blend", ".dae"}
-                and p != OUT_FBX]
+                and p != OUT_GLB]
 if other_models:
     raise SystemExit("Refusing to mix Olivia model versions: " + ", ".join(str(p) for p in other_models))
 
 tmp = Path(tempfile.mkdtemp(prefix="ff3d_olivia_rig_"))
 with zipfile.ZipFile(ARCHIVE) as zf:
     glb_name = next(n for n in zf.namelist() if n.lower().endswith(".glb"))
-    source_glb = tmp / "olivia.glb"
+    source_glb = tmp / "olivia_source.glb"
     source_glb.write_bytes(zf.read(glb_name))
 
-# Extract embedded GLB image payloads so the final FBX can carry the same textures.
-raw_glb = source_glb.read_bytes()
-if raw_glb[:4] != b"glTF":
-    raise SystemExit("Olivia source is not a valid GLB.")
-offset = 12
-gltf_json = None
-binary_chunk = b""
-while offset + 8 <= len(raw_glb):
-    chunk_size, chunk_type = struct.unpack_from("<II", raw_glb, offset)
-    offset += 8
-    chunk = raw_glb[offset:offset + chunk_size]
-    offset += chunk_size
-    if chunk_type == 0x4E4F534A:
-        gltf_json = json.loads(chunk.decode("utf-8").rstrip("\x00 "))
-    elif chunk_type == 0x004E4942:
-        binary_chunk = chunk
-if gltf_json is None:
-    raise SystemExit("Olivia GLB has no JSON chunk.")
+def read_glb_json(path: Path):
+    data = path.read_bytes()
+    if data[:4] != b"glTF":
+        raise SystemExit(f"Invalid GLB header: {path}")
+    version, declared_length = struct.unpack_from("<II", data, 4)
+    if version != 2 or declared_length != len(data):
+        raise SystemExit(f"Invalid GLB version/length: {path}")
+    offset = 12
+    gltf = None
+    binary = b""
+    while offset + 8 <= len(data):
+        chunk_size, chunk_type = struct.unpack_from("<II", data, offset)
+        offset += 8
+        chunk = data[offset:offset + chunk_size]
+        offset += chunk_size
+        if chunk_type == 0x4E4F534A:
+            gltf = json.loads(chunk.decode("utf-8").rstrip("\x00 "))
+        elif chunk_type == 0x004E4942:
+            binary = chunk
+    if gltf is None:
+        raise SystemExit(f"GLB JSON chunk missing: {path}")
+    return data, gltf, binary
 
-image_dir = tmp / "textures"
+_, source_json, source_binary = read_glb_json(source_glb)
+image_dir = tmp / "source_textures"
 image_dir.mkdir()
 extracted_images = {}
-for index, image in enumerate(gltf_json.get("images", [])):
+for index, image in enumerate(source_json.get("images", [])):
     mime = image.get("mimeType", "image/png")
     ext = ".jpg" if "jpeg" in mime or "jpg" in mime else ".webp" if "webp" in mime else ".png"
     if "bufferView" in image:
-        view = gltf_json["bufferViews"][image["bufferView"]]
+        view = source_json["bufferViews"][image["bufferView"]]
         start = view.get("byteOffset", 0)
-        image_bytes = binary_chunk[start:start + view["byteLength"]]
+        image_bytes = source_binary[start:start + view["byteLength"]]
     elif image.get("uri", "").startswith("data:"):
         image_bytes = base64.b64decode(image["uri"].split(",", 1)[1])
     else:
         raise SystemExit(f"Unsupported external Olivia image reference: {image}")
     source_path = image_dir / f"Image_{index}{ext}"
     source_path.write_bytes(image_bytes)
+    normalized_path = image_dir / f"Image_{index}_normalized.png"
     try:
         with Image.open(source_path) as source_image:
             source_image.load()
-            rgba = source_image.convert("RGBA")
-            width, height = rgba.size
-            normalized_path = image_dir / f"Image_{index}_normalized.png"
-            rgba.save(normalized_path, format="PNG", optimize=True)
+            source_image.convert("RGBA").save(normalized_path, format="PNG", optimize=True)
     except Exception as exc:
         raise SystemExit(f"Could not decode embedded Olivia image {index} ({mime}): {exc}")
     extracted_images[index] = normalized_path
@@ -98,7 +101,6 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images), flush=True)
 
-# Recreate image datablocks from the decoded embedded images and remap material nodes by GLB image index.
 loaded_images_by_index = {}
 for index, path in extracted_images.items():
     with Image.open(path) as source_image:
@@ -112,14 +114,16 @@ for index, path in extracted_images.items():
     )
     loaded.pixels.foreach_set(pixels.reshape(-1))
     loaded.update()
-    loaded.filepath_raw = str(path)
+    normalized_copy = image_dir / f"BlenderTexture_{index}.png"
+    loaded.filepath_raw = str(normalized_copy)
     loaded.file_format = "PNG"
     loaded.save()
     loaded.pack()
-    if not loaded.has_data:
+    if not loaded.has_data or loaded.size[0] <= 0 or loaded.size[1] <= 0:
         raise SystemExit(f"Could not create Blender texture data for Olivia image {index}")
     loaded_images_by_index[index] = loaded
 
+mapped_image_indices = set()
 for material in bpy.data.materials:
     if material.use_nodes and material.node_tree:
         for node in material.node_tree.nodes:
@@ -130,15 +134,16 @@ for material in bpy.data.materials:
                 index = int(match.group(1))
                 if index in loaded_images_by_index:
                     node.image = loaded_images_by_index[index]
+                    mapped_image_indices.add(index)
 
+if not mapped_image_indices:
+    raise SystemExit("No Olivia material nodes were linked to the extracted GLB textures.")
 used_source_images = set()
 for material in bpy.data.materials:
     if material.use_nodes and material.node_tree:
         for node in material.node_tree.nodes:
             if node.type == "TEX_IMAGE" and node.image:
                 used_source_images.add(node.image)
-if not used_source_images:
-    raise SystemExit("Olivia has no material texture images after remapping.")
 for image in used_source_images:
     if not image.has_data or image.size[0] <= 0 or image.size[1] <= 0:
         raise SystemExit(f"Olivia texture has no decoded pixels: {image.name}")
@@ -165,7 +170,6 @@ z0 = mins[2]
 def z(ratio):
     return z0 + height * ratio
 
-# Humanoid A-pose guide, fitted to the measured source proportions.
 z_hips, z_knee, z_ankle = z(0.49), z(0.25), z(0.06)
 z_spine, z_chest, z_neck, z_head = z(0.64), z(0.78), z(0.84), z(0.99)
 z_elbow, z_wrist, z_hand = z(0.68), z(0.57), z(0.52)
@@ -207,7 +211,6 @@ for side, label in ((-1, "Left"), (1, "Right")):
               (center_x + side * wrist_x, center_y, z_wrist), f"{label}UpperArm")
     make_bone(f"{label}Hand", (center_x + side * wrist_x, center_y, z_wrist),
               (center_x + side * hand_x, center_y, z_hand), f"{label}LowerArm")
-
     make_bone(f"{label}UpperLeg", (center_x + side * hip_x, center_y, z_hips),
               (center_x + side * knee_x, center_y, z_knee), "Hips")
     make_bone(f"{label}LowerLeg", (center_x + side * knee_x, center_y, z_knee),
@@ -268,7 +271,7 @@ for obj in meshes:
 
 bone_weight_counts = {name: 0 for name in bone_segments}
 for obj in meshes:
-    group_names = {g.index: g.name for g in obj.vertex_groups}
+    group_names = {group.index: group.name for group in obj.vertex_groups}
     for vertex in obj.data.vertices:
         for assignment in vertex.groups:
             name = group_names.get(assignment.group)
@@ -312,55 +315,53 @@ bpy.context.view_layer.update()
 if deformation < 0.0001:
     raise SystemExit("Rig pose test produced no measurable mesh deformation.")
 
-out_fbx = tmp / "Olivia.fbx"
-scale_factor = 1.78 / height
-# Remove import-only empty nodes so the exporter cannot accidentally include legacy hierarchy.
+# Keep only the rig and skinned meshes in the exported GLB.
 for obj in list(bpy.context.scene.objects):
     if obj.type not in {"MESH", "ARMATURE"}:
         bpy.data.objects.remove(obj, do_unlink=True)
-bpy.ops.object.select_all(action="DESELECT")
-armature.select_set(True)
-for obj in meshes:
-    obj.select_set(True)
-bpy.context.view_layer.objects.active = armature
 
-fbx_operator = bpy.ops.export_scene.fbx
-fbx_properties = {prop.identifier for prop in fbx_operator.get_rna_type().properties}
-print("FBX_EXPORT_PROPERTIES=" + ",".join(sorted(fbx_properties)), flush=True)
-fbx_args = {
-    "filepath": str(out_fbx),
-    "use_selection": True,
-    "object_types": {"ARMATURE", "MESH"},
-    "global_scale": scale_factor,
-    "apply_unit_scale": True,
-    "use_mesh_modifiers": True,
-    "add_leaf_bones": False,
-    "use_armature_deform_only": True,
-    "bake_anim": False,
-    "path_mode": "COPY",
-    "embed_textures": True,
-    "axis_forward": "-Z",
-    "axis_up": "Y",
+out_glb = tmp / "Olivia.glb"
+gltf_operator = bpy.ops.export_scene.gltf
+gltf_properties = {prop.identifier for prop in gltf_operator.get_rna_type().properties}
+gltf_args = {
+    "filepath": str(out_glb),
+    "export_format": "GLB",
+    "export_image_format": "AUTO",
+    "export_materials": "EXPORT",
+    "export_texcoords": True,
+    "export_normals": True,
+    "export_tangents": True,
+    "export_skins": True,
+    "export_animations": False,
+    "export_cameras": False,
+    "export_lights": False,
+    "export_apply": False,
+    "export_yup": True,
 }
-if "use_selection" not in fbx_properties:
-    fbx_args.pop("use_selection", None)
-if "object_types" not in fbx_properties:
-    fbx_args.pop("object_types", None)
-fbx_args = {key: value for key, value in fbx_args.items() if key in fbx_properties}
-fbx_operator(**fbx_args)
-if not out_fbx.is_file() or out_fbx.stat().st_size < 1024:
-    raise SystemExit("Blender FBX exporter did not create a usable Olivia file.")
+gltf_args = {key: value for key, value in gltf_args.items() if key in gltf_properties}
+print("GLTF_EXPORT_PROPERTIES=" + ",".join(sorted(gltf_properties)), flush=True)
+gltf_operator(**gltf_args)
+if not out_glb.is_file() or out_glb.stat().st_size < 1024:
+    raise SystemExit("Blender did not create a usable rigged Olivia GLB.")
 
-# Round-trip the FBX to verify that the rig and skin weights survive export.
+_, exported_json, _ = read_glb_json(out_glb)
+exported_images = len(exported_json.get("images", []))
+exported_meshes = len(exported_json.get("meshes", []))
+exported_skins = len(exported_json.get("skins", []))
+if exported_meshes != source_mesh_count:
+    raise SystemExit(f"GLB mesh count mismatch: {exported_meshes} != {source_mesh_count}")
+if exported_skins != 1:
+    raise SystemExit(f"Rigged Olivia GLB must contain exactly one skin, found {exported_skins}")
+if exported_images != len(used_source_images):
+    raise SystemExit(f"Olivia texture export mismatch: source={len(used_source_images)} GLB={exported_images}")
+
+# Round-trip the GLB and verify skeleton, skin weights, texture count and scale.
 bpy.ops.wm.read_factory_settings(use_empty=True)
-if hasattr(bpy.ops.wm, "fbx_import"):
-    bpy.ops.wm.fbx_import(filepath=str(out_fbx), use_anim=False)
-else:
-    bpy.ops.import_scene.fbx(filepath=str(out_fbx), use_anim=False)
+bpy.ops.import_scene.gltf(filepath=str(out_glb))
 reimport_meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 reimport_armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
 if len(reimport_meshes) != source_mesh_count or len(reimport_armatures) != 1:
-    raise SystemExit(f"FBX round-trip mismatch: meshes={len(reimport_meshes)} armatures={len(reimport_armatures)}")
+    raise SystemExit(f"GLB round-trip mismatch: meshes={len(reimport_meshes)} armatures={len(reimport_armatures)}")
 reimport_armature = reimport_armatures[0]
 required_bones = {
     "Hips", "Spine", "Chest", "Neck", "Head",
@@ -369,38 +370,40 @@ required_bones = {
 }
 missing_bones = required_bones - {bone.name for bone in reimport_armature.data.bones}
 if missing_bones:
-    raise SystemExit("FBX lost humanoid bones: " + ", ".join(sorted(missing_bones)))
+    raise SystemExit("GLB lost humanoid bones: " + ", ".join(sorted(missing_bones)))
 for obj in reimport_meshes:
     if not any(modifier.type == "ARMATURE" for modifier in obj.modifiers):
-        raise SystemExit(f"FBX mesh lost armature modifier: {obj.name}")
+        raise SystemExit(f"GLB mesh lost armature modifier: {obj.name}")
     if weighted_vertex_count(obj) != len(obj.data.vertices):
-        raise SystemExit(f"FBX mesh has unweighted vertices: {obj.name}")
+        raise SystemExit(f"GLB mesh has unweighted vertices: {obj.name}")
 
 reimport_points = [o.matrix_world @ Vector(corner) for o in reimport_meshes for corner in o.bound_box]
 reimport_height = max(p.z for p in reimport_points) - min(p.z for p in reimport_points)
 if not 1.55 <= reimport_height <= 2.0:
-    raise SystemExit(f"Unexpected scaled Olivia height after FBX round-trip: {reimport_height}")
+    raise SystemExit(f"Unexpected scaled Olivia height after GLB round-trip: {reimport_height}")
 
 report = {
     "rigging_method": "manual_segment_distance_weights_v1",
     "source_model": glb_name,
     "source_height_m": round(height, 3),
-    "export_scale_factor": round(scale_factor, 6),
+    "export_scale_factor": round(1.78 / height, 6),
     "target_height_m": round(reimport_height, 3),
     "source_meshes": source_mesh_count,
     "reimport_meshes": len(reimport_meshes),
     "source_vertices": source_vertex_count,
     "source_faces": source_face_count,
     "source_texture_images": len(used_source_images),
+    "glb_images": exported_images,
+    "glb_meshes": exported_meshes,
+    "glb_skins": exported_skins,
     "armature_bones": len(reimport_armature.data.bones),
     "bone_weight_counts": bone_weight_counts,
     "pose_test_max_deformation_m": round(deformation, 6),
-    "fbx_size_bytes": out_fbx.stat().st_size,
-    "fbx_sha256": hashlib.sha256(out_fbx.read_bytes()).hexdigest(),
+    "glb_size_bytes": out_glb.stat().st_size,
+    "glb_sha256": hashlib.sha256(out_glb.read_bytes()).hexdigest(),
 }
 
-OUT_FBX.parent.mkdir(parents=True, exist_ok=True)
-out_fbx.replace(OUT_FBX)
+out_glb.replace(OUT_GLB)
 REPORT_FILE.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 print("OLIVIA_RIG_TEST_OK")
 print(json.dumps(report, indent=2))
