@@ -170,6 +170,28 @@ jobs:
           PY
           test -s game/assets/weapons/awm_free_fire.glb
 
+      - name: Download CC0 footsteps audio
+        run: |
+          mkdir -p game/assets/audio build/audio
+          curl -L --fail --retry 3 -A "FreeFire3D-asset-pipeline/1.0" "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip" -o /tmp/kenney-rpg-audio.zip
+          python3 - <<'PY'
+          import zipfile, pathlib, json
+          archive=pathlib.Path('/tmp/kenney-rpg-audio.zip')
+          with zipfile.ZipFile(archive) as z:
+              matches=[n for n in z.namelist() if n.lower().endswith('/footstep00.ogg') or n.lower()=='footstep00.ogg']
+              if not matches:
+                  raise SystemExit('Kenney CC0 audio pack is missing footstep00.ogg')
+              target=pathlib.Path('game/assets/audio/footstep00.ogg')
+              target.write_bytes(z.read(matches[0]))
+              for index in range(1,4):
+                  options=[n for n in z.namelist() if n.lower().endswith('/footstep%02d.ogg'%index) or n.lower()=='footstep%02d.ogg'%index]
+                  if options:
+                      pathlib.Path('game/assets/audio/footstep%02d.ogg'%index).write_bytes(z.read(options[0]))
+              pathlib.Path('game/assets/audio/ASSET_CREDITS.txt').write_text('Footstep audio: Kenney RPG Audio, CC0 1.0. Source: https://kenney.nl/assets/rpg-audio and https://opengameart.org/content/50-rpg-sound-effects\\n',encoding='utf-8')
+              print('FOOTSTEP_AUDIO_OK',matches[0],target.stat().st_size)
+          PY
+          test -s game/assets/audio/footstep00.ogg
+
       - name: Prepare Android debug signing
         run: |
           mkdir -p "$HOME/.android"
