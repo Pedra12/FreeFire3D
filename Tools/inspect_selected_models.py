@@ -96,6 +96,11 @@ for image in bpy.data.images:
                    and (p.stem.lower().startswith(stem) or stem.startswith(p.stem.lower()))]
         if len(matches) == 1:
             candidate = matches[0]
+        elif len(matches) > 1:
+            import hashlib
+            hashes = {hashlib.sha256(p.read_bytes()).hexdigest() for p in matches}
+            if len(hashes) == 1:
+                candidate = sorted(matches)[0]
     if candidate is None:
         missing_textures.append(requested)
         continue
