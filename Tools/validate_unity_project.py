@@ -86,6 +86,24 @@ if map_model.exists():
         except Exception as exc:
             errors.append(f"Invalid Clocktower AssetImportReport.json: {exc}")
 
+olivia_model = ROOT / "Assets/Game/Characters/Olivia/Olivia.fbx"
+olivia_report = ROOT / "Assets/Game/Characters/Olivia/OliviaRigReport.json"
+if olivia_model.exists():
+    require(olivia_report.is_file(), "Olivia FBX exists without its rig report.")
+    if olivia_report.is_file():
+        try:
+            report = json.loads(olivia_report.read_text(encoding="utf-8"))
+            require(1.55 <= report.get("target_height_m", 0) <= 2.0,
+                    "Olivia rig report has an invalid gameplay height.")
+            require(report.get("pose_test_max_deformation_m", 0) > 0.0001,
+                    "Olivia rig report does not prove mesh deformation.")
+            require(report.get("source_meshes") == report.get("reimport_meshes") == 7,
+                    "Olivia FBX round-trip did not preserve all seven meshes.")
+            require(report.get("armature_bones", 0) >= 15,
+                    "Olivia rig report contains too few humanoid bones.")
+        except Exception as exc:
+            errors.append(f"Invalid OliviaRigReport.json: {exc}")
+
 if errors:
     print("UNITY_STRUCTURE_CHECK_FAILED")
     for error in errors:
