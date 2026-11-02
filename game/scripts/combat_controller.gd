@@ -33,12 +33,14 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
-	var aiming := is_instance_valid(hud) and bool(hud.get("aiming"))
+	var aiming := false
+	if is_instance_valid(hud):
+		aiming = hud.get("aiming") == true
 	camera.fov = lerpf(camera.fov, aim_fov if aiming else normal_fov, 1.0 - exp(-12.0 * delta))
 
 	if reloading or not is_instance_valid(hud):
 		return
-	if bool(hud.get("firing")) and fire_cooldown <= 0.0:
+	if hud.get("firing") == true and fire_cooldown <= 0.0:
 		if ammo_in_magazine > 0:
 			_fire_once()
 		elif reserve_ammo > 0:
@@ -48,6 +50,8 @@ func reload() -> void:
 	if reloading or ammo_in_magazine >= magazine_size or reserve_ammo <= 0:
 		return
 	reloading = true
+	if player.has_method("play_action_animation"):
+		player.play_action_animation(&"Pistol_Reload")
 	await get_tree().create_timer(reload_duration).timeout
 	if not is_inside_tree():
 		return
@@ -61,6 +65,8 @@ func reload() -> void:
 func _fire_once() -> void:
 	fire_cooldown = fire_interval
 	ammo_in_magazine -= 1
+	if player.has_method("play_action_animation"):
+		player.play_action_animation(&"Pistol_Shoot")
 	_emit_ammo()
 
 	var viewport_size := camera.get_viewport().get_visible_rect().size
