@@ -1,13 +1,18 @@
 extends Node3D
 
-## Builds collision from the imported world meshes without creating colliders
+signal collisions_ready(generated: int, skipped: int)
+
+## Builds collision from imported world meshes without creating colliders
 ## for sky, cloud cards, or water surfaces.
 @export var generate_collisions: bool = true
 @export var skip_material_tokens: PackedStringArray = PackedStringArray(["cloud", "wave", "water", "sky"])
+var is_ready_for_queries: bool = false
 
 func _ready() -> void:
 	if generate_collisions:
 		call_deferred("_generate_map_collisions")
+	else:
+		is_ready_for_queries = true
 
 func _should_skip(mesh_instance: MeshInstance3D) -> bool:
 	var mesh := mesh_instance.mesh
@@ -33,7 +38,15 @@ func _generate_map_collisions() -> void:
 		if mesh_instance == null or _should_skip(mesh_instance):
 			skipped += 1
 			continue
+		var first_new_child := mesh_instance.get_child_count()
 		mesh_instance.create_trimesh_collision()
+		if mesh_instance.name.to_lower().contains("vaultable"):
+			for child_index in range(first_new_child, mesh_instance.get_child_count()):
+				var collider := mesh_instance.get_child(child_index)
+				if collider is StaticBody3D:
+					collider.add_to_group("vaultable")
 		generated += 1
+	is_ready_for_queries = true
+	collisions_ready.emit(generated, skipped)
 	print("WORLD_COLLISIONS generated=", generated,
 		" skipped=", skipped, " mesh_nodes=", mesh_nodes.size())
