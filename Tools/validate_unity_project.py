@@ -72,6 +72,20 @@ for relative in ("Assets/Game/Characters/Olivia", "Assets/Game/Maps/Clocktower")
             f"More than one model in canonical asset slot {relative}: "
             + ", ".join(p.name for p in model_files))
 
+map_model = ROOT / "Assets/Game/Maps/Clocktower/Clocktower.glb"
+map_report = ROOT / "Assets/Game/Maps/Clocktower/AssetImportReport.json"
+if map_model.exists():
+    require(map_report.is_file(), "Clocktower GLB exists without its import report.")
+    if map_report.is_file():
+        try:
+            report = json.loads(map_report.read_text(encoding="utf-8"))
+            require(report.get("texture_references_missing") == 0,
+                    "Clocktower import report records missing texture references.")
+            require(report.get("glb_images") == report.get("used_source_texture_images"),
+                    "Clocktower GLB does not contain every used source texture image.")
+        except Exception as exc:
+            errors.append(f"Invalid Clocktower AssetImportReport.json: {exc}")
+
 if errors:
     print("UNITY_STRUCTURE_CHECK_FAILED")
     for error in errors:
