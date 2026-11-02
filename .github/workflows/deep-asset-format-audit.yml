@@ -6,6 +6,7 @@ on:
       - reverse-engineering-audit
     paths:
       - ".github/workflows/deep-asset-format-audit.yml"
+      - "docs/deep-asset-audit-trigger.md"
   workflow_dispatch:
 
 permissions:
