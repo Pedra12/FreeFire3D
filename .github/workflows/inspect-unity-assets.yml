@@ -125,6 +125,45 @@ jobs:
           print(json.dumps(report, indent=2))
           PY
           python inspect_bundles.py
+      - name: Test metadata-assisted Unity bundle decryption
+        run: |
+          cat > try_decrypt.py <<'PY'
+          import os, re, json, ast, glob, UnityPy
+          from UnityPy.helpers.ArchiveStorageManager import brute_force_key
+          report = json.load(open("unity_asset_report.json", encoding="utf-8"))
+          metadata = glob.glob("unity_asset_export/*global-metadata.dat")
+          results = []
+          pattern = re.compile(rb"(?=([\\x20-\\x7E]{16}))")
+          for item in report.get("bundles", []):
+              sig = item.get("decrypt_signature")
+              if not sig:
+                  continue
+              bundle = item["path"]
+              row = {"bundle": bundle, "metadata_candidates": metadata, "success": False}
+              for meta in metadata:
+                  try:
+                      key_sig = ast.literal_eval(sig["key_sig"])
+                      data_sig = ast.literal_eval(sig["data_sig"])
+                      key = brute_force_key(meta, key_sig, data_sig, pattern)
+                      row["key_found"] = True
+                      row["key_hex"] = key.hex() if isinstance(key, bytes) else str(key)
+                      UnityPy.set_assetbundle_decrypt_key(key)
+                      env = UnityPy.load(bundle)
+                      counts = {}
+                      for obj in env.objects:
+                          name = obj.type.name
+                          counts[name] = counts.get(name, 0) + 1
+                      row["success"] = True
+                      row["object_counts"] = counts
+                      break
+                  except Exception as e:
+                      row.setdefault("attempt_errors", []).append(repr(e)[:500])
+              results.append(row)
+          with open("decryption_test.json", "w", encoding="utf-8") as f:
+              json.dump(results, f, indent=2)
+          print(json.dumps(results, indent=2))
+          PY
+          python try_decrypt.py
       - name: Upload full inspection and extracted assets
         uses: actions/upload-artifact@v4
         with:
