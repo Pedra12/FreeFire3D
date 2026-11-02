@@ -16,11 +16,8 @@ if not source.is_file():
 bpy.ops.wm.open_mainfile(filepath=str(source))
 scene = bpy.context.scene
 
-# The source scene is authored Y-up. Blender is Z-up, so rotate the complete
-# scene before glTF export; the exporter then converts Z-up back to glTF Y-up.
-rotation = Matrix.Rotation(math.radians(90.0), 4, "X")
-for obj in list(scene.objects):
-    obj.matrix_world = rotation @ obj.matrix_world
+# The source Clocktower scene is already Y-up. Keep its original axes; a
+# manual 90-degree rotation would turn the map depth into its vertical axis.
 
 # Repair the absolute Windows paths stored by the original Blender project.
 relinked = 0
@@ -62,8 +59,8 @@ base_center = (base_min + base_max) * 0.5
 # Center the 87 x 113 metre block and use the center of the terrain base as
 # the provisional ground reference. Godot validation will verify the floor.
 horizontal_center_x = (minimum.x + maximum.x) * 0.5
-horizontal_center_y = (minimum.y + maximum.y) * 0.5
-shift = Vector((-horizontal_center_x, -horizontal_center_y, -base_center.z))
+horizontal_center_z = (minimum.z + maximum.z) * 0.5
+shift = Vector((-horizontal_center_x, -base_center.y, -horizontal_center_z))
 for obj in list(scene.objects):
     obj.matrix_world.translation += shift
 
@@ -106,7 +103,7 @@ report = {
     "missing_images": missing_images,
     "normalized_bounds": {"min": list(minimum), "max": list(maximum), "dimensions": list(maximum - minimum)},
     "base_bounds_before_centering": {"min": list(base_min), "max": list(base_max), "center": list(base_center)},
-    "ground_reference_before_centering": base_center.z,
+    "ground_reference_before_centering": base_center.y,
     "objects": [{"name": obj.name, "vertices": len(obj.data.vertices), "triangles": sum(max(0, len(poly.vertices) - 2) for poly in obj.data.polygons)} for obj in mesh_objects]
 }
 Path(str(output) + ".json").write_text(json.dumps(report, indent=2), encoding="utf-8")
