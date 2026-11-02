@@ -40,7 +40,7 @@ jobs:
               if (!im.uri) continue;
               const target=im.uri;
               if (!fs.existsSync(target)) {
-                const alt=target.replace('_png(\\.[^.]+)$','$1');
+                const alt=target.replace(/_png(\.[^.]+)$/,'$1');
                 if (fs.existsSync(alt)) fs.copyFileSync(alt,target);
               }
             }
