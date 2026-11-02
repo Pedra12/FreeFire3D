@@ -21,7 +21,8 @@ jobs:
       - name: Install Blender and extraction tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender unzip
+          sudo apt-get install -y blender unzip python3-numpy python3-pip
+          python3 -m pip install --break-system-packages usd-core
       - name: Recursively extract model archives
         shell: bash
         run: |
@@ -79,7 +80,7 @@ jobs:
                   if ext in ('.glb','.gltf'):
                       bpy.ops.import_scene.gltf(filepath=str(p))
                   elif ext=='.fbx':
-                      bpy.ops.import_scene.fbx(filepath=str(p),use_anim=True)
+                      bpy.ops.import_scene.fbx(filepath=str(p))
                   elif ext=='.obj':
                       if hasattr(bpy.ops.wm,'obj_import'): bpy.ops.wm.obj_import(filepath=str(p))
                       else: bpy.ops.import_scene.obj(filepath=str(p))
@@ -112,7 +113,7 @@ jobs:
           print('OK',sum(x['status']=='ok' for x in results))
           print('FAILED',sum(x['status']=='error' for x in results))
           PY
-          blender -b --factory-startup --python /tmp/inspect_assets.py
+          PYTHONPATH=/usr/lib/python3/dist-packages blender -b --factory-startup --python /tmp/inspect_assets.py
       - name: Create decision summary
         run: |
           python3 - <<'PY'
