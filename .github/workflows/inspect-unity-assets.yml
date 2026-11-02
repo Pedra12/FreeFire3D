@@ -25,7 +25,7 @@ jobs:
       - name: Decode bundles, export readable assets and build evidence report
         run: |
           cat > inspect_bundles.py <<'PY'
-          import os, json, hashlib, zipfile, collections, re
+          import os, json, hashlib, zipfile, collections, re, gzip, tempfile
           import UnityPy
 
           OUT = "unity_asset_export"
@@ -69,7 +69,16 @@ jobs:
               item["header_hex"] = raw[:24].hex()
               item["header_ascii"] = "".join(chr(x) if 32 <= x < 127 else "." for x in raw[:32])
               try:
-                  env = UnityPy.load(path)
+                  load_path = path
+                  if raw[:2] == b"\\x1f\\x8b":
+                      decompressed = gzip.decompress(raw)
+                      load_path = os.path.join(OUT, safe(os.path.basename(path)) + "_gzip_unwrapped")
+                      with open(load_path, "wb") as df:
+                          df.write(decompressed)
+                      item["gzip_wrapped"] = True
+                      item["decompressed_bytes"] = len(decompressed)
+                      item["decompressed_header_hex"] = decompressed[:24].hex()
+                  env = UnityPy.load(load_path)
                   counts = collections.Counter()
                   names = collections.defaultdict(list)
                   for obj in env.objects:
@@ -145,8 +154,11 @@ jobs:
                       key_sig = ast.literal_eval(sig["key_sig"].replace("\\\\", "\\"))
                       data_sig = ast.literal_eval(sig["data_sig"].replace("\\\\", "\\"))
                       key = brute_force_key(meta, key_sig, data_sig, pattern)
-                      row["key_found"] = True
-                      row["key_hex"] = key.hex() if isinstance(key, bytes) else str(key)
+                      row["key_found"] = isinstance(key, bytes)
+                      if not isinstance(key, bytes):
+                          row.setdefault("attempt_errors", []).append("No matching AES key found in metadata")
+                          continue
+                      row["key_hex"] = key.hex()
                       UnityPy.set_assetbundle_decrypt_key(key)
                       env = UnityPy.load(bundle)
                       counts = {}
