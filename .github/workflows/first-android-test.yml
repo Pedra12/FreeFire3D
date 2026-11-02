@@ -128,6 +128,7 @@ jobs:
       - name: Import and validate Godot project
         run: |
           "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
+          "$GODOT_BIN" --headless --path game --script res://scripts/scale_audit.gd 2>&1 | tee build/scale-audit.log
           "$GODOT_BIN" --headless --path game --quit-after 8 2>&1 | tee build/godot-smoke-test.log
           grep "BERMUDA_COLLISIONS generated=" build/godot-smoke-test.log
           grep -E "ERROR:|SCRIPT ERROR:" build/godot-import.log build/godot-smoke-test.log && exit 1 || true
