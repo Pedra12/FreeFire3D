@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  preview-maps:
+  inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -20,107 +20,81 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y blender
-      - name: Extract map sources
+      - name: Extract assets
         run: |
-          mkdir -p /tmp/map-preview audit/previews audit/logs
+          mkdir -p /tmp/assets audit/previews audit/logs
           python3 - <<'PY'
           import zipfile,io,pathlib,re
-          root=pathlib.Path('/tmp/map-preview')
+          root=pathlib.Path('/tmp/assets')
           def walk(label,raw,depth=0):
             try:
               with zipfile.ZipFile(io.BytesIO(raw)) as z:
                 for i in z.infolist():
                   if i.is_dir(): continue
-                  e=pathlib.Path(i.filename).suffix.lower()
-                  b=z.read(i)
-                  if e=='.zip' and depth<5: walk(label+'_'+pathlib.Path(i.filename).name,b,depth+1)
-                  elif e in ('.blend','.usdz','.usdc','.obj','.mtl','.png','.jpg','.jpeg'):
-                    q=root/(re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+i.filename))
-                    q.parent.mkdir(parents=True,exist_ok=True); q.write_bytes(b)
-            except Exception as ex: print('archive issue',label,str(ex)[:200])
+                  ext=pathlib.Path(i.filename).suffix.lower(); data=z.read(i)
+                  if ext=='.zip' and depth<5: walk(label+'_'+pathlib.Path(i.filename).name,data,depth+1)
+                  elif ext in ('.blend','.usdz'):
+                    p=root/(re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+i.filename)); p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(data)
+            except Exception as e: print('EXTRACT_ERROR',label,str(e))
           for p in pathlib.Path('.').iterdir():
             if p.suffix.lower() in ('.zip','.usdz'): walk(p.stem,p.read_bytes())
-          print('Extracted sources:')
-          for p in root.rglob('*'):
-            if p.is_file() and p.suffix.lower() in ('.blend','.usdz','.obj'): print(p,p.stat().st_size)
+          print('\n'.join(str(p) for p in root.rglob('*') if p.is_file()))
           PY
-      - name: Inspect and render Blender scenes
+      - name: Inspect and render Blender files
         shell: bash
         run: |
-          cat > /tmp/preview.py <<'PY'
-          import bpy, json, os, traceback
-          from mathutils import Vector
+          cat > /tmp/audit.py <<'PY'
+          import bpy,json,os,traceback
           from pathlib import Path
+          from mathutils import Vector
           scene=bpy.context.scene
-          meshes=[o for o in scene.objects if o.type=='MESH']
+          meshes=[o for o in scene.objects if o.type=='MESH']; points=[]
+          objects=[]
+          for o in meshes:
+            corners=[o.matrix_world @ Vector(c) for c in o.bound_box]; points+=corners
+            objects.append({'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'materials':[m.name if m else None for m in o.data.materials]})
           mats=[]
           for m in bpy.data.materials:
             refs=[]
             if m.use_nodes and m.node_tree:
               for n in m.node_tree.nodes:
-                if n.type=='TEX_IMAGE' and n.image:
-                  refs.append({'image':n.image.name,'filepath':n.image.filepath,'packed':bool(n.image.packed_file),'size':list(n.image.size)})
+                if n.type=='TEX_IMAGE' and n.image: refs.append({'image':n.image.name,'path':n.image.filepath,'packed':bool(n.image.packed_file),'size':list(n.image.size)})
             mats.append({'name':m.name,'images':refs})
-          objects=[]
-          pts=[]
-          for o in meshes:
-            corners=[o.matrix_world @ Vector(c) for c in o.bound_box]; pts.extend(corners)
-            objects.append({'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),
-              'materials':[m.name if m else None for m in o.data.materials],
-              'bounds':{a:[min(getattr(v,a) for v in corners),max(getattr(v,a) for v in corners)] for a in 'xyz'}})
-          result={'file':bpy.data.filepath,'mesh_objects':len(meshes),'objects':objects,'materials':mats}
-          if pts:
-            result['scene_bounds']={a:[min(getattr(p,a) for p in pts),max(getattr(p,a) for p in pts)] for a in 'xyz'}
+          out={'file':bpy.data.filepath,'mesh_objects':len(meshes),'objects':objects,'materials':mats}
+          if points: out['bounds']={a:[min(getattr(p,a) for p in points),max(getattr(p,a) for p in points)] for a in 'xyz'}
           try:
             if meshes:
-              center=sum(pts,Vector())/len(pts); span=max((Vector(result['scene_bounds']['x']+[0,0])).length,1)
-              lo=Vector([result['scene_bounds'][a][0] for a in 'xyz'])
-              hi=Vector([result['scene_bounds'][a][1] for a in 'xyz'])
-              span=max((hi-lo).length,1)
-              camd=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',camd); scene.collection.objects.link(cam)
-              cam.location=center+Vector((1.4,-1.8,1.35)).normalized()*span*1.8
-              cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler()
-              camd.lens=50; scene.camera=cam
-              ld=bpy.data.lights.new('AuditKey','AREA'); lamp=bpy.data.objects.new('AuditKey',ld); scene.collection.objects.link(lamp)
-              lamp.location=center+Vector((0,-span,span*1.3)); ld.energy=max(span*span*8,1500); ld.size=span*.7
-              scene.render.engine='BLENDER_WORKBENCH'
-              scene.display.shading.light='STUDIO'; scene.display.shading.color_type='MATERIAL'
-              scene.render.resolution_x=960; scene.render.resolution_y=720; scene.render.resolution_percentage=60
-              scene.render.image_settings.file_format='PNG'
-              name=Path(bpy.data.filepath).stem
-              scene.render.filepath=os.path.abspath('audit/previews/'+name+'.png')
-              bpy.ops.render.render(write_still=True)
-              result['preview']=scene.render.filepath
-          except Exception as e:
-            result['preview_error']=str(e); result['traceback']=traceback.format_exc()[-3000:]
-          Path('audit/'+Path(bpy.data.filepath).stem+'.json').write_text(json.dumps(result,indent=2),encoding='utf8')
+              lo=Vector([out['bounds'][a][0] for a in 'xyz']); hi=Vector([out['bounds'][a][1] for a in 'xyz']); center=(lo+hi)*.5; span=max((hi-lo).length,1)
+              cd=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',cd); scene.collection.objects.link(cam)
+              cam.location=center+Vector((1.4,-1.8,1.35)).normalized()*span*1.8; cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler(); cd.lens=50; scene.camera=cam
+              scene.render.engine='BLENDER_WORKBENCH'; scene.display.shading.light='STUDIO'; scene.display.shading.color_type='MATERIAL'
+              scene.render.resolution_x=960; scene.render.resolution_y=720; scene.render.resolution_percentage=60; scene.render.image_settings.file_format='PNG'
+              scene.render.filepath=os.path.abspath('audit/previews/'+Path(bpy.data.filepath).stem+'.png')
+              bpy.ops.render.render(write_still=True); out['preview']=scene.render.filepath
+          except Exception as e: out['preview_error']=str(e); out['traceback']=traceback.format_exc()[-2500:]
+          Path('audit/'+Path(bpy.data.filepath).stem+'.json').write_text(json.dumps(out,indent=2),encoding='utf8')
           PY
-          find /tmp/map-preview -type f -name '*.blend' -print0 | while IFS= read -r -d '' f; do
-            echo "INSPECTING $f"
-            blender -b "$f" --python /tmp/preview.py > "audit/logs/$(basename "$f").log" 2>&1 || echo "BLENDER_FAILED:$f" | tee -a audit/logs/failures.txt
+          find /tmp/assets -name '*.blend' -print0 | while IFS= read -r -d '' f; do
+            blender -b "$f" --python /tmp/audit.py > "audit/logs/$(basename "$f").log" 2>&1 || echo "FAILED $f" >> audit/logs/failures.txt
           done
-      - name: Inspect USDZ scene
+      - name: Inspect USDZ
         shell: bash
         run: |
           cat > /tmp/usd.py <<'PY'
           import bpy,json,pathlib,traceback
           from mathutils import Vector
-          p=next(pathlib.Path('/tmp/map-preview').glob('*.usdz'),None)
-          out={'source':str(p) if p else None}
+          p=next(pathlib.Path('/tmp/assets').glob('*.usdz'),None); out={'source':str(p) if p else None}
           try:
             if p:
-              bpy.ops.wm.usd_import(filepath=str(p))
-              objs=[o for o in bpy.context.scene.objects if o.type=='MESH']
-              pts=[o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
-              out['mesh_objects']=len(objs)
-              out['objects']=[{'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'materials':[m.name if m else None for m in o.data.materials]} for o in objs]
+              bpy.ops.wm.usd_import(filepath=str(p)); objs=[o for o in bpy.context.scene.objects if o.type=='MESH']; pts=[o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
+              out['mesh_objects']=len(objs); out['objects']=[{'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons)} for o in objs]
               if pts: out['bounds']={a:[min(getattr(v,a) for v in pts),max(getattr(v,a) for v in pts)] for a in 'xyz'}
-            else: out['error']='No USDZ found'
-          except Exception as e: out['error']=str(e); out['traceback']=traceback.format_exc()[-3000:]
-          pathlib.Path('audit/usdz-import.json').write_text(json.dumps(out,indent=2),encoding='utf8')
+            else: out['error']='USDZ not found'
+          except Exception as e: out['error']=str(e); out['traceback']=traceback.format_exc()[-2500:]
+          pathlib.Path('audit/usdz.json').write_text(json.dumps(out,indent=2),encoding='utf8')
           PY
           blender -b --python /tmp/usd.py > audit/logs/usdz.log 2>&1 || true
-      - name: Upload visual and material audit
+      - name: Upload audit even if a preview fails
         if: always()
         uses: actions/upload-artifact@v4
         with:
