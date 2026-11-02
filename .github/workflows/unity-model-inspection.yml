@@ -1,0 +1,28 @@
+name: Inspect selected 3D models
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "SourceArchives/**"
+      - "Tools/inspect_selected_models.py"
+      - ".github/workflows/unity-model-inspection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated Unity project
+        uses: actions/checkout@v4
+      - name: Install Blender for source model inspection
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+      - name: Inspect Olivia and Clocktower model structure
+        run: blender --background --python Tools/inspect_selected_models.py -- "$GITHUB_WORKSPACE"
