@@ -1,0 +1,133 @@
+name: Free Fire static reverse audit
+
+on:
+  push:
+    branches:
+      - reverse-engineering-audit
+    paths:
+      - ".github/workflows/freefire-static-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Android package source and assets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, io, json, re, hashlib
+          from pathlib import Path
+          from collections import Counter
+
+          report = {
+            "scope": "Read-only static inspection of repository archives. No game files modified.",
+            "android_package": {},
+            "source_classes": [],
+            "keyword_hits": {},
+            "manifest_files": [],
+            "resource_xml": [],
+            "other_archives": []
+          }
+
+          target = Path("com.dts.freefireth.zip")
+          if target.exists():
+            raw = target.read_bytes()
+            report["android_package"]["archive_bytes"] = len(raw)
+            report["android_package"]["sha256"] = hashlib.sha256(raw).hexdigest()
+            with zipfile.ZipFile(io.BytesIO(raw)) as z:
+              infos = [i for i in z.infolist() if not i.is_dir()]
+              report["android_package"]["entry_count"] = len(infos)
+              report["android_package"]["extensions"] = dict(Counter(Path(i.filename).suffix.lower() or "[none]" for i in infos))
+              terms = [
+                "UnityPlayer", "UnityPlayerActivity", "GameActivity", "NativeActivity",
+                "AssetBundle", "StreamingAssets", "obb", "patch", "download",
+                "login", "auth", "firebase", "billing", "garena", "freefire",
+                "network", "websocket", "socket", "analytics", "crash"
+              ]
+              hits = {t: [] for t in terms}
+              for info in infos:
+                name = info.filename
+                low = name.lower()
+                if low.endswith(".java"):
+                  try:
+                    src = z.read(info).decode("utf-8", "replace")
+                  except Exception:
+                    continue
+                  pkg = re.search(r"(?m)^\s*package\s+([\w.]+)\s*;", src)
+                  cls = re.search(r"(?m)^\s*(?:public\s+|protected\s+|private\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum)\s+(\w+)", src)
+                  report["source_classes"].append({
+                    "path": name,
+                    "package": pkg.group(1) if pkg else None,
+                    "class": cls.group(1) if cls else Path(name).stem,
+                    "bytes": info.file_size
+                  })
+                  text = src.lower()
+                  for term in terms:
+                    if term.lower() in text:
+                      if len(hits[term]) < 80:
+                        hits[term].append(name)
+                elif "androidmanifest.xml" in low:
+                  data = z.read(info)
+                  report["manifest_files"].append({
+                    "path": name, "bytes": info.file_size,
+                    "preview": data[:12000].decode("utf-8", "replace")
+                  })
+                elif low.endswith(".xml") and any(k in low for k in ("strings", "values", "layout", "xml/")):
+                  data = z.read(info)
+                  preview = data[:3500].decode("utf-8", "replace")
+                  if any(k in preview.lower() for k in ("unity", "garena", "free fire", "freefire", "login", "account", "permission", "download", "update")):
+                    report["resource_xml"].append({"path": name, "bytes": info.file_size, "preview": preview})
+              report["keyword_hits"] = {k:v for k,v in hits.items() if v}
+              report["android_package"]["java_class_count"] = len(report["source_classes"])
+              report["android_package"]["java_packages"] = dict(Counter(x["package"] for x in report["source_classes"] if x["package"]))
+              report["source_classes"].sort(key=lambda x: (x["package"] or "", x["class"] or ""))
+          else:
+            report["android_package"]["error"] = "com.dts.freefireth.zip not found"
+
+          for p in sorted(Path(".").iterdir()):
+            if p.is_file() and p.suffix.lower() in (".zip", ".usdz"):
+              try:
+                with zipfile.ZipFile(p) as z:
+                  infos=[i for i in z.infolist() if not i.is_dir()]
+                  report["other_archives"].append({
+                    "archive":p.name, "bytes":p.stat().st_size, "entries":len(infos),
+                    "formats":dict(Counter(Path(i.filename).suffix.lower() or "[none]" for i in infos))
+                  })
+              except Exception as e:
+                report["other_archives"].append({"archive":p.name,"error":str(e)[:200]})
+
+          Path("freefire-static-audit.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+          with open("freefire-static-audit-summary.txt","w",encoding="utf-8") as f:
+            a=report["android_package"]
+            f.write("FREE FIRE STATIC REVERSE AUDIT - READ ONLY\n\n")
+            f.write("ANDROID PACKAGE\n")
+            f.write(json.dumps(a,ensure_ascii=False,indent=2)+"\n\n")
+            f.write("JAVA PACKAGES\n")
+            f.write(json.dumps(a.get("java_packages",{}),ensure_ascii=False,indent=2)+"\n\n")
+            f.write("KEYWORD HIT COUNTS\n")
+            f.write(json.dumps({k:len(v) for k,v in report["keyword_hits"].items()},ensure_ascii=False,indent=2)+"\n\n")
+            f.write("SAMPLE CLASS PATHS\n")
+            for c in report["source_classes"][:250]:
+              f.write(f'{c["package"] or ""} | {c["class"]} | {c["path"]}\n')
+            f.write("\nARCHIVE INVENTORY\n")
+            f.write(json.dumps(report["other_archives"],ensure_ascii=False,indent=2)+"\n")
+          print("JAVA_CLASSES",len(report["source_classes"]))
+          print("PACKAGES",len(report["android_package"].get("java_packages",{})))
+          print("KEYWORDS",{k:len(v) for k,v in report["keyword_hits"].items()})
+          print("MANIFESTS",len(report["manifest_files"]),"RESOURCE_XML",len(report["resource_xml"]))
+          PY
+      - name: Upload static reverse audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: freefire-static-reverse-audit
+          path: |
+            freefire-static-audit.json
+            freefire-static-audit-summary.txt
+          if-no-files-found: error
+          retention-days: 7
