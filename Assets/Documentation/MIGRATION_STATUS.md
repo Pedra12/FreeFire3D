@@ -13,7 +13,7 @@
 ## Not yet completed
 
 - The two selected source ZIP files are stored in `SourceArchives/`, outside the Unity `Assets/` folder. The current GitHub file tools cannot decode their binary contents for safe extraction and inspection.
-- No character model or map model has been copied into Unity.
+- No character model or map model has been copied into Unity. The only source archives are isolated in `SourceArchives/`, outside the playable asset tree.
 - No Unity Editor import, C# compile, scene test, Android build or device test has been performed.
 - The mobile HUD components are input building blocks; the actual HUD canvas and button layout are not yet assembled.
 - Weapon/combat, bots, interiors and match scene are not yet implemented.
