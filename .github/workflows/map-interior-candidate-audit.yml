@@ -1,0 +1,171 @@
+name: Map and building interior candidate audit
+
+on:
+  push:
+    branches:
+      - world-rebuild-riverside
+    paths:
+      - ".github/workflows/map-interior-candidate-audit.yml"
+      - "free-fire-ful-map.zip"
+      - "free-fire-nexterra-map.zip"
+      - "free-fire-burmuda-map-the-circuit-3d-model.zip"
+      - "free-fire-clocktower-3d-model-by-rs-ratul.zip"
+      - "free-fire-old-peak-house-by-no-rules-yt.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender and archive tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender unzip
+          blender --version
+      - name: Extract candidate maps and buildings
+        run: |
+          mkdir -p /tmp/candidates audit/candidates audit/previews audit/logs
+          python3 - <<'PY'
+          import zipfile, pathlib, re
+          names = [
+            "free-fire-ful-map.zip",
+            "free-fire-nexterra-map.zip",
+            "free-fire-burmuda-map-the-circuit-3d-model.zip",
+            "free-fire-clocktower-3d-model-by-rs-ratul.zip",
+            "free-fire-old-peak-house-by-no-rules-yt.zip",
+          ]
+          root = pathlib.Path("/tmp/candidates")
+          def walk(label, raw, depth=0):
+            if depth > 5: return
+            try:
+              import io
+              with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                for info in z.infolist():
+                  if info.is_dir(): continue
+                  data = z.read(info)
+                  ext = pathlib.Path(info.filename).suffix.lower()
+                  if ext == ".zip":
+                    walk(label + "__" + pathlib.Path(info.filename).stem, data, depth + 1)
+                  elif ext in (".blend", ".obj", ".mtl", ".fbx", ".gltf", ".glb"):
+                    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", label + "__" + info.filename)
+                    p = root / safe
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_bytes(data)
+            except Exception as e:
+              print("ARCHIVE_ERROR", label, str(e)[:300])
+          for name in names:
+            p = pathlib.Path(name)
+            if p.exists(): walk(p.stem, p.read_bytes())
+            else: print("ARCHIVE_MISSING", name)
+          print("CANDIDATE_FILES", sum(1 for p in root.rglob("*") if p.is_file()))
+          for p in sorted(root.rglob("*")):
+            if p.is_file() and p.suffix.lower() in (".blend", ".obj", ".fbx", ".gltf", ".glb"):
+              print("CANDIDATE", p, p.stat().st_size)
+          PY
+      - name: Inspect dimensions, building names, floors and stair candidates
+        shell: bash
+        run: |
+          cat > /tmp/audit_candidate.py <<'PY'
+          import bpy, json, os, sys, traceback
+          from pathlib import Path
+          from mathutils import Vector
+          source = Path(os.environ["CANDIDATE_FILE"])
+          ext = source.suffix.lower()
+          try:
+            bpy.ops.object.select_all(action="SELECT")
+            bpy.ops.object.delete(use_global=False)
+            if ext == ".blend":
+              bpy.ops.wm.open_mainfile(filepath=str(source))
+            elif ext == ".fbx":
+              bpy.ops.import_scene.fbx(filepath=str(source))
+            elif ext in (".gltf", ".glb"):
+              bpy.ops.import_scene.gltf(filepath=str(source))
+            elif ext == ".obj":
+              if hasattr(bpy.ops.wm, "obj_import"):
+                bpy.ops.wm.obj_import(filepath=str(source))
+              else:
+                bpy.ops.import_scene.obj(filepath=str(source))
+            meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+            records, points = [], []
+            for o in meshes:
+              corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
+              points.extend(corners)
+              lo = [min(getattr(v, a) for v in corners) for a in "xyz"]
+              hi = [max(getattr(v, a) for v in corners) for a in "xyz"]
+              records.append({
+                "name": o.name,
+                "dimensions": [round(hi[i]-lo[i], 4) for i in range(3)],
+                "min": [round(v, 4) for v in lo],
+                "max": [round(v, 4) for v in hi],
+                "vertices": len(o.data.vertices),
+                "polygons": len(o.data.polygons),
+              })
+            result = {
+              "source": str(source),
+              "format": ext,
+              "blender": bpy.app.version_string,
+              "mesh_count": len(meshes),
+              "object_count": len(bpy.context.scene.objects),
+              "meshes": records,
+              "keyword_matches": [r for r in records if any(k in r["name"].lower() for k in ("stair", "step", "door", "floor", "house", "building", "interior", "room"))],
+            }
+            if points:
+              lo = [min(getattr(v,a) for v in points) for a in "xyz"]
+              hi = [max(getattr(v,a) for v in points) for a in "xyz"]
+              result["scene_bounds"] = {"min": lo, "max": hi, "size": [round(hi[i]-lo[i],4) for i in range(3)]}
+              center = Vector([(lo[i]+hi[i])*0.5 for i in range(3)])
+              span = max((Vector(hi)-Vector(lo)).length, 1.0)
+              scene = bpy.context.scene
+              cd = bpy.data.cameras.new("AuditCamera")
+              cam = bpy.data.objects.new("AuditCamera", cd)
+              scene.collection.objects.link(cam)
+              cam.location = center + Vector((1.5,-2.0,1.3)).normalized()*span*1.8
+              cam.rotation_euler = (center-cam.location).to_track_quat("-Z","Y").to_euler()
+              cd.lens = 50
+              scene.camera = cam
+              scene.render.engine = "BLENDER_WORKBENCH"
+              scene.display.shading.light = "STUDIO"
+              scene.display.shading.color_type = "MATERIAL"
+              scene.render.resolution_x = 960
+              scene.render.resolution_y = 720
+              scene.render.resolution_percentage = 65
+              scene.render.image_settings.file_format = "PNG"
+              preview = Path("audit/previews") / (source.stem[:100] + ".png")
+              scene.render.filepath = str(preview.resolve())
+              bpy.ops.render.render(write_still=True)
+              result["preview"] = str(preview)
+            out = Path("audit/candidates") / (source.stem[:120] + ".json")
+            out.write_text(json.dumps(result, indent=2), encoding="utf8")
+            print("CANDIDATE_AUDIT_OK", json.dumps({k:result.get(k) for k in ("source","mesh_count","scene_bounds","preview")}))
+          except Exception as e:
+            print("CANDIDATE_AUDIT_FAILED", str(source), repr(e))
+            print(traceback.format_exc()[-4000:])
+            raise
+          PY
+          find /tmp/candidates -type f \( -name '*.blend' -o -name '*.obj' -o -name '*.fbx' -o -name '*.gltf' -o -name '*.glb' \) -print0 |
+          while IFS= read -r -d '' f; do
+            export CANDIDATE_FILE="$f"
+            base="$(basename "$f")"
+            blender -b --python /tmp/audit_candidate.py > "audit/logs/${base}.log" 2>&1 || echo "FAILED $f" >> audit/logs/failures.txt
+          done
+          python3 - <<'PY'
+          import json, pathlib
+          files=list(pathlib.Path("audit/candidates").glob("*.json"))
+          print("CANDIDATES_AUDITED",len(files))
+          for p in files:
+            d=json.loads(p.read_text())
+            print("SUMMARY",d["source"],"meshes",d["mesh_count"],"bounds",d.get("scene_bounds",{}).get("size"),"keyword_meshes",len(d.get("keyword_matches",[])),"preview",d.get("preview"))
+          PY
+      - name: Upload candidate audit and visual previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-interior-candidate-audit
+          path: audit/
+          if-no-files-found: warn
+          retention-days: 14
