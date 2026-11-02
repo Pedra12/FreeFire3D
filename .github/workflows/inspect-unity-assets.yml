@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install UnityPy
-        run: python -m pip install --upgrade pip UnityPy
+        run: python -m pip install --upgrade pip UnityPy pycryptodome
       - name: Decode bundles, export readable assets and build evidence report
         run: |
           cat > inspect_bundles.py <<'PY'
@@ -133,7 +133,7 @@ jobs:
           report = json.load(open("unity_asset_report.json", encoding="utf-8"))
           metadata = glob.glob("unity_asset_export/*global-metadata.dat")
           results = []
-          pattern = re.compile(rb"(?=([\\x20-\\x7E]{16}))")
+          pattern = re.compile(rb"(?=([\x20-\x7E]{16}))")
           for item in report.get("bundles", []):
               sig = item.get("decrypt_signature")
               if not sig:
@@ -171,4 +171,5 @@ jobs:
           path: |
             unity_asset_report.json
             unity_asset_report.txt
+            decryption_test.json
             unity_asset_export/
