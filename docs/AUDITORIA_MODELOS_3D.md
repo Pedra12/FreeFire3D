@@ -11,6 +11,7 @@ Escopo: importação isolada dos formatos suportados pelo Blender. Nenhum asset 
 | Bermuda Masterizada GLB | 28.955 vértices / 23.389 polígonos | 142,49 × 142,49 × 8,64 | Sem rig | Manter como mapa-base atual |
 | Clocktower BLEND/OBJ | 46.176 vértices / 26.307 polígonos / 38 malhas | 87,25 × 113,65 × 27,57 | Sem rig | Bom candidato a conjunto de construções; revisar eixo, origem e materiais |
 | The Circuit OBJ | 232.981 vértices / 139.819 polígonos / 56 malhas | 428,20 × 433,82 × 76,37 | Sem rig | Cenário grande; precisa LOD, colisão simplificada e revisão de texturas |
+| River Side USDZ/USDC | 295.648 pontos / 570.383 faces / 450 malhas | 11.236 × 300 × 11.250 unidades (bounds USD) | Sem skeleton | Cenário muito detalhado com estradas, terreno, rio, represa e props; candidato de mapa, mas exige divisão em setores, LOD e colisão simplificada |
 | NeoParadise BLEND | 28.724 vértices / 23.506 polígonos / 9 malhas | 2.032 × 2.032 × 122,44 nos transforms importados | Sem rig | Não substituir Bermuda; escala/transforms precisam ser normalizados antes de comparar |
 | Lone Wolf GLTF | 136.173 vértices / 81.494 polígonos / 21 malhas | 1.600,83 × 51,93 × 14,15 | Sem esqueleto; ações detectadas pertencem a câmera/objeto | Tratar como cenário/estrutura, não personagem |
 | Bunny Bundle OBJ | 4.755 vértices / 6.926 polígonos / 5 malhas | 0,644 × 0,220 × 1,037 | Sem rig | Não serve como personagem animado sem rigging |
