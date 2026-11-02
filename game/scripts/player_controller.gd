@@ -16,7 +16,7 @@ extends CharacterBody3D
 var animation_player: AnimationPlayer
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 var camera_yaw: float = 0.0
-var camera_pitch: float = -0.12
+var camera_pitch: float = -0.06
 var camera_touch_id: int = -1
 var mouse_look: bool = false
 var jump_was_down: bool = false
@@ -133,7 +133,8 @@ func _physics_process(delta: float) -> void:
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	camera.position = camera.position.lerp(Vector3(0.0, 0.0, camera_distance), 1.0 - exp(-8.0 * delta))
-	camera.look_at(global_position + Vector3.UP * 1.15, Vector3.UP)
+	var aim_direction: Vector3 = -camera_pivot.global_transform.basis.z
+	camera.look_at(global_position + Vector3.UP * 1.25 + aim_direction * 8.0, Vector3.UP)
 
 func play_action_animation(animation_name: StringName) -> void:
 	if animation_player == null or not animation_player.has_animation(animation_name):
