@@ -71,14 +71,14 @@ func _find_ground_and_place() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var screen: Vector2 = get_viewport().get_visible_rect().size
 	if event is InputEventScreenTouch:
-		if event.pressed and event.position.x > screen.x * 0.48:
+		if event.pressed and event.position.x > screen.x * 0.48 and (not is_instance_valid(hud) or not hud.call("is_touch_on_control", event.position)):
 			camera_touch_id = event.index
 		elif not event.pressed and event.index == camera_touch_id:
 			camera_touch_id = -1
 	elif event is InputEventScreenDrag and event.index == camera_touch_id:
 		_rotate_camera(event.relative)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		mouse_look = event.pressed
+		mouse_look = event.pressed and (not is_instance_valid(hud) or not hud.call("is_touch_on_control", event.position))
 	elif event is InputEventMouseMotion and mouse_look:
 		_rotate_camera(event.relative)
 	if event.is_action_pressed("ui_cancel"):
