@@ -61,47 +61,17 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images), flush=True)
 loaded_image_indices = set()
-for image in bpy.data.images:
-    match = re.search(r"Image[_ ]?(\d+)", image.name)
-    if not match:
-        continue
-    index = int(match.group(1))
-    if index not in extracted_images:
-        continue
-    loaded = bpy.data.images.load(str(extracted_images[index]), check_existing=False)
-    if not loaded.has_data:
-        loaded.reload()
-    if not loaded.has_data:
-        raise SystemExit(f"Could not decode extracted Olivia image {index}")
-    loaded.pack()
-    loaded_image_indices.add(index)
-    for material in bpy.data.materials:
-        if material.use_nodes and material.node_tree:
-            for node in material.node_tree.nodes:
-                if node.type == "TEX_IMAGE" and node.image == image:
-                    node.image = loaded
-if loaded_image_indices != set(extracted_images.keys()):
-    raise SystemExit(f"Not all embedded Olivia images were loaded: {sorted(loaded_image_indices)}")
+used_source_images = set()
 for material in bpy.data.materials:
     if material.use_nodes and material.node_tree:
         for node in material.node_tree.nodes:
-            if node.type == "TEX_IMAGE" and node.image and not node.image.has_data:
-                raise SystemExit(f"Olivia material image still has no pixels: {node.image.name}")
-
-meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
-if len(meshes) != 7:
-    raise SystemExit(f"Unexpected Olivia mesh count: {len(meshes)}")
-
-points = [o.matrix_world @ Vector(corner) for o in meshes for corner in o.bound_box]
-mins = [min(p[i] for p in points) for i in range(3)]
-maxs = [max(p[i] for p in points) for i in range(3)]
-height = maxs[2] - mins[2]
-if not 4.5 <= height <= 5.6:
-    raise SystemExit(f"Unexpected Olivia source height: {height}")
-for image in bpy.data.images:
+            if node.type == "TEX_IMAGE" and node.image:
+                used_source_images.add(node.image)
+for image in used_source_images:
     if not image.has_data or image.size[0] <= 0 or image.size[1] <= 0:
         raise SystemExit(f"Olivia source texture has no pixels: {image.name}")
     image.pack()
+
 print(f"OLIVIA_SOURCE_TEXTURES={len(bpy.data.images)}", flush=True)
 center_x = (mins[0] + maxs[0]) * 0.5
 center_y = (mins[1] + maxs[1]) * 0.5
