@@ -55,8 +55,11 @@ func _ready() -> void:
 	_on_inventory_changed(inventory.call("get_snapshot") if inventory != null else {})
 
 func _find_ground_and_place() -> void:
-	await get_tree().physics_frame
-	await get_tree().physics_frame
+	var map_node := get_parent().get_node_or_null("Map")
+	var waited := 0
+	while map_node != null and not bool(map_node.get("is_ready_for_queries")) and waited < 600:
+		await get_tree().physics_frame
+		waited += 1
 	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 35.0, global_position + Vector3.DOWN * 100.0)
 	query.exclude = [get_rid()]
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
