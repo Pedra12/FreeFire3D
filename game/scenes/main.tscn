@@ -1,6 +1,6 @@
 [gd_scene load_steps=9 format=3]
 
-[ext_resource type="PackedScene" path="res://assets/maps/bermuda_masterizado.glb" id="1_map"]
+[ext_resource type="PackedScene" path="res://assets/maps/river_side.glb" id="1_map"]
 [ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="2_collisions"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3_player"]
 [ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="4_hud"]
@@ -38,11 +38,10 @@ fog_sky_affect = 0.35
 environment = SubResource("Environment_main")
 
 [node name="Map" parent="." instance=ExtResource("1_map")]
-scale = Vector3(1.5, 1.5, 1.5)
 script = ExtResource("2_collisions")
 
 [node name="Player" parent="." instance=ExtResource("3_player")]
-position = Vector3(0, 5, 0)
+position = Vector3(0, 6, 0)
 
 [node name="MobileHUD" type="Control" parent="."]
 anchors_preset = 15
