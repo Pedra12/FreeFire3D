@@ -27,11 +27,11 @@ func apply_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, hit_norma
 		var flash := base_material.duplicate() as StandardMaterial3D
 		flash.albedo_color = Color(1.0, 0.22, 0.12, 1.0)
 		mesh_instance.set_surface_override_material(0, flash)
-		await get_tree().create_timer(0.08).timeout
-		if is_instance_valid(mesh_instance) and health > 0.0:
-			mesh_instance.set_surface_override_material(0, base_material)
+		var flash_timer := get_tree().create_timer(0.08)
+		flash_timer.timeout.connect(_restore_material)
 	if health <= 0.0:
 		eliminated.emit()
 		queue_free()
 		return true
 	return false
+\nfunc _restore_material() -> void:\n\tif is_instance_valid(mesh_instance) and base_material != null and health > 0.0:\n\t\tmesh_instance.set_surface_override_material(0, base_material)\n
