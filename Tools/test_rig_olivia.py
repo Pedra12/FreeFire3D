@@ -381,8 +381,6 @@ reimport_meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 reimport_armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
 if len(reimport_meshes) < source_mesh_count or len(reimport_meshes) > source_mesh_count + 2 or len(reimport_armatures) != 1:
     raise SystemExit(f"GLB round-trip mismatch: meshes={len(reimport_meshes)} armatures={len(reimport_armatures)}")
-reimport_vertex_count = sum(len(obj.data.vertices) for obj in validated_reimport_meshes)
-reimport_face_count = sum(len(obj.data.polygons) for obj in validated_reimport_meshes)
 print("OLIVIA_REIMPORT_MESHES=" + ", ".join(
     f"{obj.name}:{len(obj.data.vertices)}" for obj in reimport_meshes
 ), flush=True)
@@ -410,6 +408,8 @@ skinned_reimport_meshes = [
 ]
 if len(skinned_reimport_meshes) != len(expected_mesh_node_names):
     raise SystemExit("One or more exported Olivia mesh nodes lost their armature modifier.")
+reimport_vertex_count = sum(len(obj.data.vertices) for obj in validated_reimport_meshes)
+reimport_face_count = sum(len(obj.data.polygons) for obj in validated_reimport_meshes)
 for obj in validated_reimport_meshes:
     if weighted_vertex_count(obj) != len(obj.data.vertices):
         raise SystemExit(f"Exported GLB mesh has unweighted vertices: {obj.name}")
