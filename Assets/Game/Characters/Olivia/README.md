@@ -17,7 +17,7 @@ The source model contained seven meshes but no armature, skin or animation clips
 The only selected animation donor is Quaternius Universal Animation Library Standard, CC0 1.0 Universal:
 `Assets/Game/Animations/Quaternius/UAL1_Standard.fbx`.
 
-Unity's native FBX importer is configured to import the donor as a Humanoid rig with mesh import disabled. Its clips are retargeted through Unity's Humanoid system; the donor mesh is not instantiated and is not a second playable character.
+Unity's native FBX importer is configured to import the donor as a Humanoid rig. The import postprocessor strips its renderer components; the donor is never instantiated as a playable character. Its clips are intended to retarget through Unity's Humanoid system.
 
 The generated controller uses in-place idle, walk, jog, sprint, crouch and jump clips. Weapon aim, fire and reload states will be connected when the weapon system is implemented.
 
