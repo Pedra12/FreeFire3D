@@ -54,8 +54,9 @@ func _is_vaultable(mesh_instance: MeshInstance3D) -> bool:
 			searchable += " " + material.resource_path.to_lower()
 	if searchable.contains("vaultable") or searchable.contains("window") or searchable.contains("sill") or searchable.contains("fence") or searchable.contains("barrier"):
 		return true
-	var dimensions := mesh_instance.get_transformed_aabb().size
-	var horizontal_span := maxf(dimensions.x, dimensions.z)
+	var transformed_bounds: AABB = mesh_instance.get_transformed_aabb()
+	var dimensions: Vector3 = transformed_bounds.size
+	var horizontal_span: float = maxf(dimensions.x, dimensions.z)
 	return dimensions.y >= 0.35 and dimensions.y <= 1.45 and horizontal_span >= 0.35 and horizontal_span <= 6.0
 
 func _generate_map_collisions() -> void:
