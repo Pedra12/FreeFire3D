@@ -1,6 +1,6 @@
 # Unity content selection (single-source rule)
 
-The Unity game is a clean project under `repository root (Unity project)`. Godot scenes, scripts, imported resources and project settings are not part of this project and must never be copied into it.
+This branch is a standalone Unity project. Godot scenes, scripts, imported resources and project settings are not part of this branch's working tree and must never be copied into it.
 
 ## Canonical content
 
@@ -13,7 +13,7 @@ These are the only selected character and map for the first playable vertical sl
 
 ## Import gate
 
-The source archives are stored outside `repository root (Unity project)`. They must be inspected before extraction. Confirm:
+The two selected source archives are stored at the repository root, outside the Unity `Assets/` folder. They must be inspected before extraction. Confirm:
 - exact model file and texture dependencies;
 - skeleton hierarchy, mesh weights and animation clips for Olivia;
 - map coordinate orientation, scale, material references and collision suitability;
@@ -27,11 +27,11 @@ If an approved asset is replaced, remove the old asset from its canonical destin
 
 ## Separation policy
 
-- `repository root (Unity project)`: Unity project only.
+- This branch's working tree: Unity project only, plus the two approved source archives and CI workflow.
 - Legacy Godot project: preserved on branch `4v4-premium-prototype`.
 - Root-level ZIP archives: original source archives, not runtime content.
 - Never reference a `res://` Godot path from Unity.
-- Never place Godot scenes, scripts, .import files or .godot cache inside `repository root (Unity project)`.
+- Never place Godot scenes, scripts, `.import` files or `.godot` cache in this branch.
 
 ## Current status
 
