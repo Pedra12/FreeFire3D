@@ -51,7 +51,7 @@ func _ready() -> void:
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	await _find_ground_and_place()
-	_play_first_available([&"Idle_Rifle", &"Idle", &"idle"])
+	_play_first_available([&"Idle_Loop", &"Idle", &"idle", &"Idle_Rifle"])
 	_on_inventory_changed(inventory.call("get_snapshot") if inventory != null else {})
 
 func _find_ground_and_place() -> void:
@@ -131,7 +131,7 @@ func _physics_process(delta: float) -> void:
 	elif jump_now and not jump_was_down:
 		if not _try_window_vault(forward):
 			velocity.y = jump_velocity
-			_play_first_available([&"Jump_Start", &"Jump", &"jump"])
+			_play_first_available([&"Jump_Start", &"Jump_Loop", &"Jump", &"jump"])
 	jump_was_down = jump_now
 	move_and_slide()
 
@@ -146,19 +146,19 @@ func _physics_process(delta: float) -> void:
 	if not action_animation_locked:
 		if not is_on_floor():
 			if velocity.y > 0.2:
-				_play_first_available([&"Jump", &"Jump_Loop", &"Fall"])
+				_play_first_available([&"Jump_Loop", &"Jump", &"Fall"])
 			elif velocity.y < -0.5:
-				_play_first_available([&"Fall", &"Jump_Loop"])
+				_play_first_available([&"Jump_Loop", &"Fall"])
 		elif direction.length() > 0.08:
 			if sprinting:
-				_play_first_available([&"Sprint", &"Run", &"Run_F"])
+				_play_first_available([&"Sprint_Loop", &"Sprint", &"Jog_Fwd_Loop", &"Run", &"Run_F"])
 			else:
-				_play_first_available([&"Walk", &"Walk_F", &"Walk_Forward"])
+				_play_first_available([&"Walk_Loop", &"Walk", &"Walk_F", &"Walk_Forward"])
 		else:
 			if aiming:
-				_play_first_available([&"Pistol_Aim_Neutral", &"Rifle_Aim_Idle", &"Idle"])
+				_play_first_available([&"Pistol_Aim_Neutral", &"Rifle_Aim_Idle", &"Idle_Loop", &"Idle"])
 			else:
-				_play_first_available([&"Idle", &"idle", &"Idle_Rifle"])
+				_play_first_available([&"Idle_Loop", &"Idle", &"idle", &"Idle_Rifle"])
 
 	camera_pivot.global_position = camera_pivot.global_position.lerp(global_position + Vector3.UP * camera_height, 1.0 - exp(-10.0 * delta))
 	camera_pivot.rotation.y = camera_yaw
