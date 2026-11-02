@@ -25,7 +25,7 @@ jobs:
       - name: Install Blender and archive tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender unzip
+          sudo apt-get install -y blender unzip python3-numpy libegl1 libgl1-mesa-dri
           blender --version
       - name: Extract candidate maps and buildings
         run: |
@@ -51,9 +51,10 @@ jobs:
                   ext = pathlib.Path(info.filename).suffix.lower()
                   if ext == ".zip":
                     walk(label + "__" + pathlib.Path(info.filename).stem, data, depth + 1)
-                  elif ext in (".blend", ".obj", ".mtl", ".fbx", ".gltf", ".glb"):
-                    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", label + "__" + info.filename)
-                    p = root / safe
+                  elif ext in (".blend", ".obj", ".mtl", ".fbx", ".gltf", ".glb", ".png", ".jpg", ".jpeg", ".tga"):
+                    safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "_", label)
+                    relative = pathlib.PurePosixPath(info.filename)
+                    p = root / safe_label / pathlib.Path(*relative.parts)
                     p.parent.mkdir(parents=True, exist_ok=True)
                     p.write_bytes(data)
             except Exception as e:
