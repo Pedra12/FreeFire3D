@@ -112,7 +112,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	if not action_animation_locked:
-	if not is_on_floor():
+		if not is_on_floor():
 			if velocity.y < -0.5:
 				_play_first_available([&"Jump_Land", &"Land", &"Fall"])
 			elif velocity.y > 0.2:
@@ -127,7 +127,7 @@ func _physics_process(delta: float) -> void:
 				_play_first_available([&"Pistol_Aim_Neutral", &"Rifle_Aim_Idle", &"Idle"])
 			else:
 				_play_first_available([&"Idle", &"idle", &"Idle_Rifle"])
-	
+
 	camera_pivot.global_position = camera_pivot.global_position.lerp(global_position + Vector3.UP * camera_height, 1.0 - exp(-10.0 * delta))
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
