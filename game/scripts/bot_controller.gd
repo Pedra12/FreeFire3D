@@ -1,28 +1,41 @@
 extends CharacterBody3D
 
+signal eliminated(team_id: int, killer_team: int)
+
+@export var team_id: int = 1
 @export var maximum_health: float = 100.0
-@export var move_speed: float = 2.35
-@export var detection_range: float = 48.0
-@export var attack_range: float = 13.0
-@export var attack_interval: float = 1.25
-@export var attack_damage: float = 7.0
-@export var turn_speed: float = 7.5
+@export var move_speed: float = 3.0
+@export var detection_range: float = 52.0
+@export var attack_range: float = 28.0
+@export var attack_interval: float = 0.82
+@export var attack_damage: float = 9.0
+@export var turn_speed: float = 8.5
+@export var magazine_size: int = 24
+@export var reload_duration: float = 1.8
 
 @onready var visual: Node3D = $VisualRoot
 @onready var model: Node3D = $VisualRoot/CharacterModel
 
 var health: float = 100.0
-var player: Node3D
+var target: Node3D
 var animation_player: AnimationPlayer
 var attack_timer: float = 0.8
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 var current_animation: StringName = &""
 var action_animation_locked: bool = false
+var ammo_in_magazine: int = 24
+var reloading: bool = false
+var alive: bool = true
+var footstep_clock: float = 0.0
+var strafe_sign: float = 1.0
 
 func _ready() -> void:
 	add_to_group("damageable")
+	add_to_group("combatants")
 	add_to_group("bots")
 	health = maximum_health
+	ammo_in_magazine = magazine_size
+	strafe_sign = -1.0 if get_instance_id() % 2 == 0 else 1.0
 	var animation_nodes := model.find_children("*", "AnimationPlayer", true, false)
 	if not animation_nodes.is_empty():
 		animation_player = animation_nodes[0] as AnimationPlayer
@@ -35,66 +48,178 @@ func _ready() -> void:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
 		global_position.y = float(hit.position.y) + 0.70
-	player = get_tree().get_first_node_in_group("player") as Node3D
 	_play([&"Idle", &"idle", &"Idle_Rifle"])
 
 func _physics_process(delta: float) -> void:
+	if not alive:
+		return
 	attack_timer = maxf(0.0, attack_timer - delta)
-	if not is_instance_valid(player):
-		player = get_tree().get_first_node_in_group("player") as Node3D
-		velocity.x = move_toward(velocity.x, 0.0, move_speed * delta)
-		velocity.z = move_toward(velocity.z, 0.0, move_speed * delta)
+	if reloading:
 		_apply_gravity(delta)
 		move_and_slide()
 		return
+	if not is_instance_valid(target) or not _is_valid_enemy(target) or global_position.distance_to(target.global_position) > detection_range * 1.35:
+		target = _find_enemy()
+	if not is_instance_valid(target):
+		_stop_horizontal(delta)
+		_apply_gravity(delta)
+		move_and_slide()
+		_play([&"Idle", &"idle", &"Idle_Rifle"])
+		return
 
-	var offset := player.global_position - global_position
+	var offset := target.global_position - global_position
 	offset.y = 0.0
 	var distance := offset.length()
-	if distance > detection_range:
-		velocity.x = move_toward(velocity.x, 0.0, move_speed * 2.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, move_speed * 2.0 * delta)
-		_play([&"Idle", &"idle", &"Idle_Rifle"])
-	elif distance > attack_range:
-		var direction := offset.normalized()
-		velocity.x = direction.x * move_speed
-		velocity.z = direction.z * move_speed
-		var angle := atan2(direction.x, direction.z)
-		visual.rotation.y = lerp_angle(visual.rotation.y, angle, turn_speed * delta)
+	var direction := offset.normalized()
+	var visible := _has_line_of_sight(target)
+	if distance > attack_range or not visible:
+		var travel := _avoid_obstacle(direction)
+		velocity.x = travel.x * move_speed
+		velocity.z = travel.z * move_speed
+		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(direction.x, direction.z), turn_speed * delta)
 		_play([&"Walk", &"Walk_F", &"Run", &"Idle"])
+		footstep_clock -= delta
+		if footstep_clock <= 0.0:
+			_play_footstep()
+			footstep_clock = 0.52
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, move_speed * 5.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, move_speed * 5.0 * delta)
-		var direction := offset.normalized()
+		_stop_horizontal(delta)
 		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(direction.x, direction.z), turn_speed * delta)
 		_play([&"Pistol_Aim_Neutral", &"Rifle_Aim_Idle", &"Idle_Rifle", &"Idle"])
 		if attack_timer <= 0.0:
-			_attack_player()
-			attack_timer = attack_interval
-
+			if ammo_in_magazine <= 0:
+				_reload()
+			else:
+				_attack_target()
+				attack_timer = attack_interval
 	_apply_gravity(delta)
 	move_and_slide()
+
+func _find_enemy() -> Node3D:
+	var nearest: Node3D
+	var nearest_distance := detection_range
+	for candidate in get_tree().get_nodes_in_group("combatants"):
+		if not candidate is Node3D or candidate == self or not _is_valid_enemy(candidate):
+			continue
+		var distance := global_position.distance_to((candidate as Node3D).global_position)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest = candidate as Node3D
+	return nearest
+
+func _is_valid_enemy(candidate: Node) -> bool:
+	if not is_instance_valid(candidate) or candidate == self:
+		return false
+	if candidate.get("team_id") == null or int(candidate.get("team_id")) == team_id:
+		return false
+	if candidate.is_in_group("player"):
+		var health_node := candidate.get_node_or_null("Health")
+		return health_node != null and float(health_node.get("current_health")) > 0.0
+	return float(candidate.get("health")) > 0.0
+
+func _has_line_of_sight(candidate: Node3D) -> bool:
+	var from := global_position + Vector3.UP * 1.15
+	var to := candidate.global_position + Vector3.UP * 1.15
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return true
+	var collider: Object = hit.get("collider")
+	return collider == candidate
+
+func _avoid_obstacle(direction: Vector3) -> Vector3:
+	var from := global_position + Vector3.UP * 0.9
+	var query := PhysicsRayQueryParameters3D.create(from, from + direction * 2.0)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return direction
+	var side := direction.cross(Vector3.UP).normalized() * strafe_sign
+	var alternate := PhysicsRayQueryParameters3D.create(from, from + side * 2.0)
+	alternate.exclude = [get_rid()]
+	if get_world_3d().direct_space_state.intersect_ray(alternate).is_empty():
+		return side
+	return -side
+
+func _attack_target() -> void:
+	if not is_instance_valid(target):
+		return
+	ammo_in_magazine -= 1
+	_play_action(&"Pistol_Shoot")
+	var from := global_position + Vector3.UP * 1.2
+	var to := target.global_position + Vector3.UP * 1.15
+	var spread := Vector3(randf_range(-0.045, 0.045), randf_range(-0.035, 0.035), randf_range(-0.045, 0.045))
+	to += spread * from.distance_to(to)
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		var collider: Object = hit.get("collider")
+		if collider is Node and collider.has_method("apply_damage") and collider.get("team_id") != null and int(collider.get("team_id")) != team_id:
+			collider.call("apply_damage", attack_damage, hit.position, hit.normal, self)
+	if ammo_in_magazine <= 0:
+		_reload()
+
+func _reload() -> void:
+	if reloading:
+		return
+	reloading = true
+	_play_action(&"Pistol_Reload")
+	await get_tree().create_timer(reload_duration).timeout
+	if not is_inside_tree():
+		return
+	ammo_in_magazine = magazine_size
+	reloading = false
+
+func apply_damage(amount: float, hit_position: Vector3 = Vector3.ZERO, _hit_normal: Vector3 = Vector3.UP, source: Node = null) -> bool:
+	if not alive or health <= 0.0 or amount <= 0.0:
+		return false
+	if is_instance_valid(source) and source.get("team_id") != null and int(source.get("team_id")) == team_id:
+		return false
+	health = maxf(0.0, health - amount)
+	_show_damage_number(amount, hit_position)
+	if health <= 0.0:
+		alive = false
+		var killer_team := int(source.get("team_id")) if is_instance_valid(source) and source.get("team_id") != null else -1
+		eliminated.emit(team_id, killer_team)
+		_play_action(&"Death")
+		await get_tree().create_timer(0.45).timeout
+		if is_instance_valid(self):
+			queue_free()
+		return true
+	return false
+
+func _show_damage_number(amount: float, at: Vector3) -> void:
+	var label := Label3D.new()
+	label.text = str(roundi(amount))
+	label.font_size = 42
+	label.pixel_size = 0.003
+	label.modulate = Color(1.0, 0.84, 0.32, 1.0)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	get_tree().current_scene.add_child(label)
+	label.global_position = at + Vector3.UP * 0.3
+	var tween := label.create_tween()
+	tween.tween_property(label, "position:y", label.position.y + 0.9, 0.55)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.55)
+	tween.tween_callback(label.queue_free)
+
+func _play_footstep() -> void:
+	var audio := get_node_or_null("FootstepAudio") as AudioStreamPlayer3D
+	if audio != null and audio.stream != null:
+		audio.pitch_scale = randf_range(0.94, 1.06)
+		audio.play()
+
+func _stop_horizontal(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, move_speed * 5.0 * delta)
+	velocity.z = move_toward(velocity.z, 0.0, move_speed * 5.0 * delta)
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	else:
 		velocity.y = minf(velocity.y, 0.0)
-
-func _attack_player() -> void:
-	if not is_instance_valid(player):
-		return
-	var health_node := player.get_node_or_null("Health")
-	if health_node != null and health_node.has_method("apply_damage"):
-		_play_action(&"Pistol_Shoot")
-		health_node.apply_damage(attack_damage)
-
-func apply_damage(amount: float, _hit_position: Vector3 = Vector3.ZERO, _hit_normal: Vector3 = Vector3.UP) -> void:
-	if health <= 0.0:
-		return
-	health = maxf(0.0, health - amount)
-	if health <= 0.0:
-		queue_free()
 
 func _play_action(animation_name: StringName) -> void:
 	if animation_player == null or not animation_player.has_animation(animation_name):
