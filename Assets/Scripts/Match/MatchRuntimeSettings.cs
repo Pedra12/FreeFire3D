@@ -11,7 +11,6 @@ namespace FreeFire3D.Match
         {
             Screen.orientation = ScreenOrientation.LandscapeLeft;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
-            Input.multiTouchEnabled = true;
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = targetFrameRate;
         }
