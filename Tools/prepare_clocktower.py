@@ -90,7 +90,8 @@ if missing:
     raise SystemExit("Clocktower has unresolved textures: " + ", ".join(sorted(set(missing))))
 
 # FBX import creates image datablocks with stale Windows paths but no loaded pixels.
-# Load the verified archive files explicitly and replace each material node's image reference.
+# Load each verified archive texture into a fresh Blender image datablock.
+loaded_images_by_hash = {}
 for material in bpy.data.materials:
     if not material.use_nodes or material.node_tree is None:
         continue
@@ -112,8 +113,16 @@ for material in bpy.data.materials:
                     candidate = sorted(matches)[0]
         if not candidate.is_file():
             raise SystemExit(f"Texture file not found for material {material.name}: {old_image.filepath}")
-        loaded_image = bpy.data.images.load(str(candidate), check_existing=True)
-        node.image = loaded_image
+        digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        if digest not in loaded_images_by_hash:
+            loaded_image = bpy.data.images.load(str(candidate), check_existing=False)
+            if not loaded_image.has_data:
+                loaded_image.reload()
+            if not loaded_image.has_data or loaded_image.size[0] <= 0 or loaded_image.size[1] <= 0:
+                raise SystemExit(f"Blender could not decode texture pixels: {candidate}")
+            loaded_image.pack()
+            loaded_images_by_hash[digest] = loaded_image
+        node.image = loaded_images_by_hash[digest]
 
 used_images = set()
 for material in bpy.data.materials:
