@@ -9,6 +9,7 @@ import zipfile
 from pathlib import Path
 
 import bpy
+from PIL import Image
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,11 +122,19 @@ for material in bpy.data.materials:
         print(f"TEXTURE_FILE name={candidate.name} bytes={len(raw_texture)} signature={signature} dimensions={png_dimensions}", flush=True)
         digest = hashlib.sha256(raw_texture).hexdigest()
         if digest not in loaded_images_by_hash:
-            loaded_image = bpy.data.images.load(str(candidate), check_existing=False)
-            if not loaded_image.has_data:
-                loaded_image.reload()
+            normalized_dir = temp_root / "normalized_textures"
+            normalized_dir.mkdir(exist_ok=True)
+            normalized_path = normalized_dir / f"{digest}.png"
+            try:
+                with Image.open(candidate) as source_image:
+                    source_image.load()
+                    mode = "RGBA" if "A" in source_image.getbands() else "RGB"
+                    source_image.convert(mode).save(normalized_path, format="PNG", optimize=True)
+            except Exception as exc:
+                raise SystemExit(f"Texture decode failed for {candidate}: {exc}")
+            loaded_image = bpy.data.images.load(str(normalized_path), check_existing=False)
             if not loaded_image.has_data or loaded_image.size[0] <= 0 or loaded_image.size[1] <= 0:
-                raise SystemExit(f"Blender could not decode texture pixels: {candidate}")
+                raise SystemExit(f"Blender could not decode normalized texture pixels: {normalized_path}")
             loaded_image.pack()
             loaded_images_by_hash[digest] = loaded_image
         node.image = loaded_images_by_hash[digest]
