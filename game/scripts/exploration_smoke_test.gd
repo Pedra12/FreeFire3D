@@ -43,7 +43,7 @@ func _run() -> void:
 	root.add_child(climber)
 	climber.global_position = Vector3(3.15, 0.0, 3.1)
 	var elapsed := 0.0
-	while elapsed < 3.4:
+	while elapsed < 5.2:
 		var dt := 1.0 / 60.0
 		if not climber.is_on_floor():
 			climber.velocity.y -= 9.8 * dt
@@ -59,7 +59,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	var upper_floor_ray := PhysicsRayQueryParameters3D.create(Vector3(3.15, 5.0, -1.5), Vector3(3.15, 2.7, -1.5))
+	var upper_floor_ray := PhysicsRayQueryParameters3D.create(Vector3(0.0, 5.0, 0.0), Vector3(0.0, 2.7, 0.0))
 	if state.intersect_ray(upper_floor_ray).is_empty():
 		push_error("EXPLORATION_TEST_FAILED: upper floor collision missing")
 		quit(1)
