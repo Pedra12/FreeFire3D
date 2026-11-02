@@ -67,7 +67,7 @@ func _run_test() -> void:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: player health, inventory, weapon mount or HUD missing")
 		quit(1)
 		return
-	if weapon_mount.get("mounted_weapon") == null:
+	if weapon_mount.get("mounted_weapon") == null or int(combat.get("reserve_ammo")) != 90 or int(hud.get("ammo_reserve")) != 90:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: player AWM not attached to hand")
 		quit(1)
 		return
