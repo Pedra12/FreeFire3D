@@ -174,25 +174,28 @@ jobs:
           PY
           test -s game/assets/weapons/awm_free_fire.glb
 
-      - name: Download CC0 premium weapon models
+      - name: Download CC0 premium weapon model sources
         run: |
-          mkdir -p game/assets/weapons
-          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33318/v1/model.glb -o game/assets/weapons/assault_rifle.glb
-          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33303/v1/model.glb -o game/assets/weapons/smg.glb
-          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33311/v1/model.glb -o game/assets/weapons/shotgun.glb
-          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33296/v1/model.glb -o game/assets/weapons/pistol.glb
+          mkdir -p build/weapons-source game/assets/weapons
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33318/v1/model.glb -o build/weapons-source/assault_rifle.glb
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33303/v1/model.glb -o build/weapons-source/smg.glb
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33311/v1/model.glb -o build/weapons-source/shotgun.glb
+          curl -L --fail --retry 3 https://cdn.3dassets.dev/assets/33296/v1/model.glb -o build/weapons-source/pistol.glb
           python3 - <<'PY'
-          import os, hashlib, json
-          root="game/assets/weapons"
-          report={}
+          import os
           for name in ["assault_rifle","smg","shotgun","pistol"]:
-              path=os.path.join(root,name+".glb")
+              path=f"build/weapons-source/{name}.glb"
               size=os.path.getsize(path)
-              if size < 100000: raise SystemExit(f"Weapon model too small: {name} {size}")
-              report[name]={"bytes":size,"sha256":hashlib.sha256(open(path,"rb").read()).hexdigest()}
-          with open("build/weapon-models-download.json","w") as f: json.dump(report,f,indent=2)
-          print("CC0_WEAPON_MODELS_OK",json.dumps(report))
+              if size < 100000:
+                  raise SystemExit(f"Weapon source model too small: {name} {size}")
+              print("WEAPON_SOURCE_OK",name,size)
           PY
+
+      - name: Convert weapon models to Godot-compatible GLB
+        run: |
+          /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/convert_weapon_glbs.py 2>&1 | tee build/weapon-conversion.log
+          for name in assault_rifle smg shotgun pistol; do test -s "game/assets/weapons/$name.glb"; done
+          grep "WEAPON_CONVERSION_OK" build/weapon-conversion.log
 
       - name: Download CC0 footsteps audio
         run: |
