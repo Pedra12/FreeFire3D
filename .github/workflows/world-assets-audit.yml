@@ -109,6 +109,32 @@ jobs:
                               repaired.append(line)
                           target_mtl.write_text("\n".join(repaired)+"\n",encoding="utf-8")
                   bpy.ops.wm.obj_import(filepath=str(path))
+                  # Some OBJ importers keep the MTL but do not create image nodes.
+                  # Build the Base Color links explicitly from the repaired MTL.
+                  for mtl_ref in mtl_refs:
+                      target_mtl=path.parent/mtl_ref
+                      if not target_mtl.is_file():
+                          continue
+                      active_material=None
+                      for line in target_mtl.read_text(encoding="utf-8",errors="replace").splitlines():
+                          stripped=line.strip()
+                          if stripped.lower().startswith("newmtl "):
+                              active_material=stripped.split(maxsplit=1)[1].strip()
+                          elif stripped.lower().startswith("map_kd ") and active_material:
+                              source=Path(stripped.split(maxsplit=1)[1].strip().strip('"'))
+                              texture_dir=path.parent.parent/"Texture"
+                              candidates=[path.parent/source,texture_dir/source.name,path.parent/"Texture"/source.name]
+                              found=next((candidate for candidate in candidates if candidate.is_file()),None)
+                              material=bpy.data.materials.get(active_material)
+                              if found is not None and material is not None:
+                                  image=bpy.data.images.load(str(found),check_existing=True)
+                                  material.use_nodes=True
+                                  nodes=material.node_tree.nodes
+                                  shader=nodes.get("Principled BSDF")
+                                  if shader is not None:
+                                      texture=nodes.new("ShaderNodeTexImage")
+                                      texture.image=image
+                                      material.node_tree.links.new(texture.outputs["Color"],shader.inputs["Base Color"])
               elif ext==".gltf" or ext==".glb":
                   bpy.ops.import_scene.gltf(filepath=str(path))
               elif ext==".fbx":
@@ -129,9 +155,11 @@ jobs:
                   for image in bpy.data.images:
                       if image.source != "FILE" or not image.filepath:
                           continue
-                      original=Path(bpy.path.abspath(image.filepath))
+                      raw_path=bpy.path.abspath(image.filepath).replace("\\\\","/")
+                      image_name=raw_path.split("/")[-1]
+                      original=Path(raw_path)
                       if not original.is_file():
-                          matches=[candidate for candidate in root.rglob(original.name) if candidate.is_file()]
+                          matches=[candidate for candidate in root.rglob(image_name) if candidate.is_file()]
                           if matches:
                               image.filepath=str(matches[0])
                               try:
