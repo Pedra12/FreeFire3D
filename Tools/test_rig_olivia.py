@@ -381,8 +381,8 @@ reimport_meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 reimport_armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
 if len(reimport_meshes) < source_mesh_count or len(reimport_meshes) > source_mesh_count + 2 or len(reimport_armatures) != 1:
     raise SystemExit(f"GLB round-trip mismatch: meshes={len(reimport_meshes)} armatures={len(reimport_armatures)}")
-reimport_vertex_count = sum(len(obj.data.vertices) for obj in reimport_meshes)
-reimport_face_count = sum(len(obj.data.polygons) for obj in reimport_meshes)
+reimport_vertex_count = sum(len(obj.data.vertices) for obj in validated_reimport_meshes)
+reimport_face_count = sum(len(obj.data.polygons) for obj in validated_reimport_meshes)
 print("OLIVIA_REIMPORT_MESHES=" + ", ".join(
     f"{obj.name}:{len(obj.data.vertices)}" for obj in reimport_meshes
 ), flush=True)
@@ -414,7 +414,7 @@ for obj in validated_reimport_meshes:
     if weighted_vertex_count(obj) != len(obj.data.vertices):
         raise SystemExit(f"Exported GLB mesh has unweighted vertices: {obj.name}")
 
-reimport_points = [o.matrix_world @ Vector(corner) for o in reimport_meshes for corner in o.bound_box]
+reimport_points = [o.matrix_world @ Vector(corner) for o in validated_reimport_meshes for corner in o.bound_box]
 reimport_height = max(p.z for p in reimport_points) - min(p.z for p in reimport_points)
 if not 1.55 <= reimport_height <= 2.0:
     raise SystemExit(f"Unexpected scaled Olivia height after GLB round-trip: {reimport_height}")
