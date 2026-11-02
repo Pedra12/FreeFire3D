@@ -21,6 +21,22 @@ def inspect_scene(label):
     total_verts = sum(len(o.data.vertices) for o in meshes)
     total_faces = sum(len(o.data.polygons) for o in meshes)
     print(f"TOTAL_VERTICES={total_verts} TOTAL_FACES={total_faces}", flush=True)
+    if label == "OLIVIA GLB":
+        from mathutils import Vector
+        all_vertices = [o.matrix_world @ v.co for o in meshes for v in o.data.vertices]
+        if all_vertices:
+            z_min = min(v.z for v in all_vertices)
+            z_max = max(v.z for v in all_vertices)
+            print(f"OLIVIA_HEIGHT={z_max-z_min:.3f}", flush=True)
+            for band in range(10):
+                low = z_min + (z_max-z_min) * band / 10.0
+                high = z_min + (z_max-z_min) * (band+1) / 10.0
+                points = [v for v in all_vertices if low <= v.z <= high]
+                if points:
+                    print(f"OLIVIA_PROFILE_{band}: z=({low:.2f},{high:.2f}) "
+                          f"x=({min(v.x for v in points):.2f},{max(v.x for v in points):.2f}) "
+                          f"y=({min(v.y for v in points):.2f},{max(v.y for v in points):.2f}) "
+                          f"vertices={len(points)}", flush=True)
     from mathutils import Vector
     points = [o.matrix_world @ Vector(corner) for o in meshes for corner in o.bound_box]
     if points:
