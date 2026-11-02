@@ -6,4 +6,4 @@ The original Clocktower archive contains a nested ZIP. Inside it are three alter
 
 The nested archive also contains the map textures. Preserve their relative folder structure so the FBX material references can resolve. Before using the map in the match, inspect scale, orientation, mesh complexity, material links and collision suitability. Do not assume that all buildings have walkable interiors or usable doors/windows.
 
-No map model has been imported yet. This folder remains reserved until model inspection passes.
+Source credit: RS RATUL, “FREE FIRE CLOCKTOWER 3D MODEL BY RS RATUL”, Sketchfab, licensed under Creative Commons Attribution (CC BY). Retain this attribution in the game credits and distribution notes: https://sketchfab.com/3d-models/free-fire-clocktower-3d-model-by-rs-ratul-70c66345c0b745f98972eaff255a494b\n\nNo map model has been imported yet. This folder remains reserved until model inspection passes.
