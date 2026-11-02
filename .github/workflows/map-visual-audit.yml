@@ -1,0 +1,116 @@
+name: Map visual and material audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-maps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender and image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          python3 -m pip install --user pillow
+      - name: Extract map sources
+        run: |
+          mkdir -p /tmp/map-preview audit
+          python3 - <<'PY'
+          import zipfile,io,pathlib,re
+          root=pathlib.Path('/tmp/map-preview')
+          def walk(label,raw,depth=0):
+            try:
+              with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                for i in z.infolist():
+                  if i.is_dir(): continue
+                  n=pathlib.PurePosixPath(i.filename).name
+                  e=pathlib.Path(n).suffix.lower()
+                  b=z.read(i)
+                  if e=='.zip' and depth<5: walk(label+'_'+n,b,depth+1)
+                  elif e in ('.blend','.usdz','.usdc','.obj','.mtl','.png','.jpg','.jpeg'):
+                    q=root/(re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+i.filename))
+                    q.parent.mkdir(parents=True,exist_ok=True); q.write_bytes(b)
+            except Exception as ex: print('archive issue',label,str(ex)[:200])
+          for p in pathlib.Path('.').iterdir():
+            if p.suffix.lower() in ('.zip','.usdz'): walk(p.stem,p.read_bytes())
+          PY
+      - name: Render Blender previews and material links
+        shell: bash
+        run: |
+          cat > /tmp/preview.py <<'PY'
+          import bpy, json, os, math
+          from mathutils import Vector
+          from pathlib import Path
+          scene=bpy.context.scene
+          scene.render.engine='BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items.keys() else 'BLENDER_EEVEE'
+          scene.render.resolution_x=960; scene.render.resolution_y=720; scene.render.resolution_percentage=70
+          scene.render.image_settings.file_format='PNG'
+          scene.render.film_transparent=False
+          scene.world.color=(0.12,0.12,0.12)
+          meshes=[o for o in scene.objects if o.type=='MESH']
+          if not meshes: raise Exception('No mesh objects')
+          pts=[o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
+          lo=Vector((min(p.x for p in pts),min(p.y for p in pts),min(p.z for p in pts)))
+          hi=Vector((max(p.x for p in pts),max(p.y for p in pts),max(p.z for p in pts)))
+          center=(lo+hi)*0.5; span=max((hi-lo).length,1)
+          # use an elevated three-quarter camera; Blender Z is up
+          cam_data=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',cam_data); scene.collection.objects.link(cam)
+          direction=Vector((1.4,-1.8,1.35)).normalized()
+          cam.location=center+direction*span*1.65
+          cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler()
+          cam_data.lens=50; scene.camera=cam
+          ld=bpy.data.lights.new('AuditKey','AREA'); lo_obj=bpy.data.objects.new('AuditKey',ld); scene.collection.objects.link(lo_obj)
+          lo_obj.location=center+Vector((0,-span,span*1.3)); ld.energy=max(span*span*8,1500); ld.size=span*0.7
+          mats=[]
+          for m in bpy.data.materials:
+            refs=[]
+            if m.use_nodes and m.node_tree:
+              for n in m.node_tree.nodes:
+                if n.type=='TEX_IMAGE' and n.image:
+                  refs.append({'image':n.image.name,'filepath':n.image.filepath,'packed':bool(n.image.packed_file),'size':list(n.image.size)})
+            mats.append({'name':m.name,'images':refs})
+          os.makedirs('audit/previews',exist_ok=True)
+          name=Path(bpy.data.filepath).stem
+          scene.render.filepath=os.path.abspath('audit/previews/'+name+'.png')
+          bpy.ops.render.render(write_still=True)
+          objects=[]
+          for o in meshes:
+            corners=[o.matrix_world @ Vector(c) for c in o.bound_box]
+            objects.append({'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),
+             'bounds':{a:[min(getattr(v,a) for v in corners),max(getattr(v,a) for v in corners)] for a in 'xyz'},
+             'materials':[m.name if m else None for m in o.data.materials]})
+          result={'file':bpy.data.filepath,'bounds':{a:[getattr(lo,a),getattr(hi,a)] for a in 'xyz'},
+            'objects':objects,'materials':mats,'preview':scene.render.filepath}
+          Path('audit/'+name+'.json').write_text(json.dumps(result,indent=2),encoding='utf8')
+          PY
+          find /tmp/map-preview -type f -name '*.blend' -print0 | while IFS= read -r -d '' f; do
+            blender -b "$f" --python /tmp/preview.py || echo "BLENDER_PREVIEW_FAILED:$f"
+          done
+          python3 - <<'PY'
+          import bpy, json, os, pathlib
+          from mathutils import Vector
+          src=next(pathlib.Path('/tmp/map-preview').glob('*.usdz'),None)
+          if src:
+            try:
+              bpy.ops.wm.usd_import(filepath=str(src))
+              objs=[o for o in bpy.context.scene.objects if o.type=='MESH']
+              pts=[o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
+              data={'file':str(src),'mesh_objects':len(objs),'objects':[{'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'materials':[m.name if m else None for m in o.data.materials]} for o in objs]}
+              if pts:
+                data['bounds']={a:[min(getattr(p,a) for p in pts),max(getattr(p,a) for p in pts)] for a in 'xyz'}
+              pathlib.Path('audit/usdz-import.json').write_text(json.dumps(data,indent=2),encoding='utf8')
+            except Exception as e:
+              pathlib.Path('audit/usdz-import-error.txt').write_text(str(e),encoding='utf8')
+          PY
+      - name: Upload visual and material audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: freefire3d-map-visual-audit
+          path: audit/
+          if-no-files-found: error
+          retention-days: 7
