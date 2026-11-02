@@ -45,6 +45,7 @@ required_files = [
     "Assets/Scripts/World/ClocktowerCollisionAuthoring.cs",
     "Assets/Editor/OliviaAvatarAssetBuilder.cs",
     "Assets/Editor/QuaterniusAnimationImporter.cs",
+    "Tools/inspect_quaternius_fbx.py",
     "Assets/Editor/InitialMatchSceneBuilder.cs",
     "Assets/Documentation/CONTENT_SELECTION.md",
 ]
@@ -149,6 +150,26 @@ if animation_report.is_file():
                 "Quaternius FBX SHA-256 is missing.")
     except Exception as exc:
         errors.append(f"Invalid Quaternius AnimationImportReport.json: {exc}")
+
+fbx_inspection = ROOT / "Assets/Game/Animations/Quaternius/FBXInspectionReport.json"
+require(fbx_inspection.is_file(), "Quaternius FBX is missing its Blender inspection report.")
+if fbx_inspection.is_file():
+    try:
+        report = json.loads(fbx_inspection.read_text(encoding="utf-8"))
+        require(report.get("armature_count") == 1,
+                "Quaternius FBX must contain exactly one animation armature.")
+        require(report.get("bone_count", 0) >= 20,
+                "Quaternius FBX inspection found too few bones.")
+        require(report.get("animation_action_count") == report.get("animation_count", 43),
+                "Quaternius FBX inspection did not confirm the expected animation count.")
+        require(report.get("animation_action_count", 0) >= 20,
+                "Quaternius FBX contains too few imported animation actions.")
+        require(not report.get("missing_required_actions"),
+                "Quaternius FBX is missing required locomotion actions.")
+        require(len(report.get("fbx_sha256", "")) == 64,
+                "Quaternius FBX inspection hash is missing.")
+    except Exception as exc:
+        errors.append(f"Invalid Quaternius FBXInspectionReport.json: {exc}")
 
 if errors:
     print("UNITY_STRUCTURE_CHECK_FAILED")
