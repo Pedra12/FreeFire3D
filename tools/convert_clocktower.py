@@ -59,8 +59,8 @@ base_center = (base_min + base_max) * 0.5
 # Center the 87 x 113 metre block and use the center of the terrain base as
 # the provisional ground reference. Godot validation will verify the floor.
 horizontal_center_x = (minimum.x + maximum.x) * 0.5
-horizontal_center_z = (minimum.z + maximum.z) * 0.5
-shift = Vector((-horizontal_center_x, -base_center.y, -horizontal_center_z))
+horizontal_center_y = (minimum.y + maximum.y) * 0.5
+shift = Vector((-horizontal_center_x, -horizontal_center_y, -base_center.z))
 for obj in list(scene.objects):
     obj.matrix_world.translation += shift
 
@@ -103,8 +103,8 @@ report = {
     "missing_images": missing_images,
     "normalized_bounds": {"min": list(minimum), "max": list(maximum), "dimensions": list(maximum - minimum)},
     "base_bounds_before_centering": {"min": list(base_min), "max": list(base_max), "center": list(base_center)},
-    "ground_reference_before_centering": base_center.y,
-    "objects": [{"name": obj.name, "vertices": len(obj.data.vertices), "triangles": sum(max(0, len(poly.vertices) - 2) for poly in obj.data.polygons)} for obj in mesh_objects]
+    "ground_reference_before_centering": base_center.z,
+    "objects": [{"name": obj.name, "vertices": len(obj.data.vertices), "triangles": sum(max(0, len(poly.vertices) - 2) for poly in obj.data.polygons), "bounds_min": list(Vector([min(point[i] for point in world_corners(obj)) for i in range(3)])), "bounds_max": list(Vector([max(point[i] for point in world_corners(obj)) for i in range(3)])), "center": list((Vector([min(point[i] for point in world_corners(obj)) for i in range(3)]) + Vector([max(point[i] for point in world_corners(obj)) for i in range(3)])) * 0.5)} for obj in mesh_objects]
 }
 Path(str(output) + ".json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print("CLOCKTOWER_GLB_OK", json.dumps({key: report[key] for key in ["output_bytes", "mesh_count", "vertices", "triangles", "materials", "relinked_images", "missing_images", "normalized_bounds", "ground_reference_before_centering"]}))
