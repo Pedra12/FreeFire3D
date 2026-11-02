@@ -1,0 +1,25 @@
+name: Unity project structure checks
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "Assets/**"
+      - "Packages/**"
+      - "ProjectSettings/**"
+      - "Tools/**"
+      - ".github/workflows/unity-project-structure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Unity project
+        uses: actions/checkout@v4
+      - name: Validate isolated Unity project
+        run: python3 Tools/validate_unity_project.py
