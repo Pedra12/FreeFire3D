@@ -32,8 +32,9 @@ func _on_node_added(node: Node) -> void:
 func _connect_bot(node: Node) -> void:
 	if not is_instance_valid(node) or not node.is_in_group("bots"):
 		return
-	if node.has_signal("eliminated") and not node.eliminated.is_connected(_on_bot_eliminated):
-		node.eliminated.connect(_on_bot_eliminated)
+	var callback := Callable(self, "_on_bot_eliminated")
+	if node.has_signal("eliminated") and not node.is_connected(&"eliminated", callback):
+		node.connect(&"eliminated", callback)
 	_update_hud()
 
 func _on_player_eliminated(killer_team: int = -1) -> void:
@@ -43,7 +44,7 @@ func _on_player_eliminated(killer_team: int = -1) -> void:
 		team_kills[killer_team] += 1
 	_check_winner()
 
-func _on_bot_eliminated(team_id: int, killer_team: int) -> void:
+func _on_bot_eliminated(_team_id: int, killer_team: int) -> void:
 	if match_over:
 		return
 	if killer_team >= 0 and killer_team < 2:
