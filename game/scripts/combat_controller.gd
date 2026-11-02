@@ -62,6 +62,8 @@ var fire_cooldown: float = 0.0
 var reloading: bool = false
 
 func _ready() -> void:
+	if inventory != null and inventory.has_signal("inventory_changed"):
+		inventory.connect("inventory_changed", _on_inventory_changed)
 	equip_weapon(&"awm")
 	if is_instance_valid(hud):
 		if hud.has_signal("reload_requested"):
@@ -200,6 +202,12 @@ func _show_tracer(start: Vector3, finish: Vector3) -> void:
 	await get_tree().create_timer(0.055).timeout
 	if is_instance_valid(visual):
 		visual.queue_free()
+
+func _on_inventory_changed(_snapshot: Dictionary) -> void:
+	if inventory == null:
+		return
+	reserve_ammo = int(inventory.call("get_ammo", current_ammo_type))
+	_emit_ammo()
 
 func _emit_ammo() -> void:
 	ammo_changed.emit(ammo_in_magazine, reserve_ammo)
