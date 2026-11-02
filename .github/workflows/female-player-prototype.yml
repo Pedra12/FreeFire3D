@@ -48,7 +48,6 @@ jobs:
           JS
           node merge.mjs Superhero_Female_FullBody.gltf female_player_rigged.glb UAL1_Standard.glb UAL2_Standard.glb | tee "$GITHUB_WORKSPACE/build/merge-report.log"
           test -s female_player_rigged.glb
-          cp female_player_rigged.glb "$GITHUB_WORKSPACE/game/assets/characters/female_player_rigged.glb"
           cd "$GITHUB_WORKSPACE"
           sha256sum game/assets/characters/female_player_rigged.glb | tee build/female-player-sha256.txt
 
