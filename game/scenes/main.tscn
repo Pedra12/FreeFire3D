@@ -1,9 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/maps/bermuda_masterizado.glb" id="1_map"]
 [ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="2_collisions"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3_player"]
 [ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="4_hud"]
+[ext_resource type="Script" path="res://scripts/bot_spawner.gd" id="5_spawner"]
+[ext_resource type="PackedScene" path="res://scenes/bot.tscn" id="6_bot"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMaterial_main"]
 sky_top_color = Color(0.12, 0.28, 0.48, 1)
@@ -56,3 +58,8 @@ rotation = Vector3(-0.82, -0.58, 0.0)
 light_energy = 1.15
 shadow_enabled = true
 directional_shadow_max_distance = 180.0
+
+[node name="BotSpawner" type="Node3D" parent="."]
+script = ExtResource("5_spawner")
+bot_scene = ExtResource("6_bot")
+bot_count = 4
