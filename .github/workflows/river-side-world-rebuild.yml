@@ -48,7 +48,7 @@ jobs:
           PY
       - name: Convert USD scene to glTF binary with Blender
         run: |
-          USD_FILE="$(find build/river_side/source -maxdepth 1 \\( -iname '*.usdc' -o -iname '*.usd' \\) | head -n 1)"
+          USD_FILE="$(find build/river_side/source -maxdepth 1 -iname '*.usdc' -o -iname '*.usd' | head -n 1)"
           test -n "$USD_FILE"
           cat > build/river_side/convert_usd.py <<'PY'
           import bpy, os, json
