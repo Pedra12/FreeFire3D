@@ -1,1 +1,0 @@
-Trigger read-only texture reconnection test.

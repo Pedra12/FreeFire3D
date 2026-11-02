@@ -1,1 +1,0 @@
-Trigger for the read-only map visual/material audit. No source assets changed.
