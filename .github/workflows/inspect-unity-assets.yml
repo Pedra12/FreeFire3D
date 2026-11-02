@@ -70,7 +70,7 @@ jobs:
               item["header_ascii"] = "".join(chr(x) if 32 <= x < 127 else "." for x in raw[:32])
               try:
                   load_path = path
-                  if raw[:2] == b"\\x1f\\x8b":
+                  if raw[:2] == bytes.fromhex("1f8b"):
                       decompressed = gzip.decompress(raw)
                       load_path = os.path.join(OUT, safe(os.path.basename(path)) + "_gzip_unwrapped")
                       with open(load_path, "wb") as df:
