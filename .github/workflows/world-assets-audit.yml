@@ -87,6 +87,23 @@ jobs:
                       if obj is not None:
                           bpy.context.scene.collection.objects.link(obj)
               elif ext==".obj":
+                  # Repair broken MTL texture paths in redistributed Free Fire OBJ archives.
+                  # The Circuit MTL points to a creator's old absolute paths and bare filenames,
+                  # while the actual PNGs are stored in the sibling Texture directory.
+                  mtl_path=path.with_suffix(".mtl")
+                  if mtl_path.exists():
+                      repaired=[]
+                      texture_dir=path.parent.parent/"Texture"
+                      for line in mtl_path.read_text(encoding="utf-8",errors="replace").splitlines():
+                          stripped=line.strip()
+                          if stripped.lower().startswith("map_kd "):
+                              source=Path(stripped.split(maxsplit=1)[1].strip().strip('"'))
+                              candidates=[path.parent/source, texture_dir/source.name, path.parent/"Texture"/source.name]
+                              found=next((candidate for candidate in candidates if candidate.is_file()),None)
+                              if found is not None:
+                                  line="map_Kd "+os.path.relpath(found,path.parent).replace(os.sep,"/")
+                          repaired.append(line)
+                      mtl_path.write_text("\\n".join(repaired)+"\\n",encoding="utf-8")
                   bpy.ops.wm.obj_import(filepath=str(path))
               elif ext==".gltf" or ext==".glb":
                   bpy.ops.import_scene.gltf(filepath=str(path))
