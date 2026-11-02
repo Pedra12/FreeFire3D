@@ -44,6 +44,7 @@ required_files = [
     "Assets/Scripts/Match/MatchRuntimeSettings.cs",
     "Assets/Scripts/World/ClocktowerCollisionAuthoring.cs",
     "Assets/Editor/OliviaAvatarAssetBuilder.cs",
+    "Assets/Editor/QuaterniusAnimationImporter.cs",
     "Assets/Editor/InitialMatchSceneBuilder.cs",
     "Assets/Documentation/CONTENT_SELECTION.md",
 ]
