@@ -1,0 +1,107 @@
+name: Bermuda Remastered full model audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/bermuda-remastered-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender and image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender libegl1
+          python3 -m pip install --user pillow
+      - name: Extract the exact Bermuda Remastered model
+        run: |
+          mkdir -p /tmp/bermuda audit
+          python3 - <<'PY'
+          import zipfile, pathlib, hashlib, json
+          archive=pathlib.Path('bermuda-remastered-free-fire.zip')
+          with zipfile.ZipFile(archive) as z:
+              names=z.namelist()
+              glb=[n for n in names if n.lower().endswith('.glb')]
+              if len(glb)!=1: raise SystemExit(f'Expected exactly one GLB, found {glb}')
+              target=pathlib.Path('/tmp/bermuda/map.glb')
+              target.write_bytes(z.read(glb[0]))
+              textures=[]
+              for n in names:
+                  if n.lower().endswith(('.png','.jpg','.jpeg','.webp')):
+                      out=pathlib.Path('/tmp/bermuda')/pathlib.Path(n).name
+                      out.write_bytes(z.read(n))
+                      textures.append({'name':pathlib.Path(n).name,'bytes':out.stat().st_size,'sha256':hashlib.sha256(out.read_bytes()).hexdigest()})
+              meta={'archive':'bermuda-remastered-free-fire.zip','archive_bytes':archive.stat().st_size,'archive_sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'glb_entry':glb[0],'glb_bytes':target.stat().st_size,'textures':textures,'archive_entries':names}
+              pathlib.Path('audit/archive-report.json').write_text(json.dumps(meta,indent=2),encoding='utf8')
+          print(json.dumps(meta,indent=2))
+          PY
+      - name: Inspect GLB scene, materials, texture links and render preview
+        shell: bash
+        run: |
+          cat > /tmp/inspect_bermuda.py <<'PY'
+          import bpy, json, os, traceback
+          from pathlib import Path
+          from mathutils import Vector
+          src='/tmp/bermuda/map.glb'
+          bpy.ops.wm.read_factory_settings(use_empty=True)
+          bpy.ops.import_scene.gltf(filepath=src)
+          scene=bpy.context.scene
+          meshes=[o for o in scene.objects if o.type=='MESH']
+          points=[]
+          objects=[]
+          for o in meshes:
+              corners=[o.matrix_world @ Vector(c) for c in o.bound_box]
+              points.extend(corners)
+              objects.append({'name':o.name,'vertices':len(o.data.vertices),'triangles':sum(max(0,len(p.vertices)-2) for p in o.data.polygons),'materials':[m.name if m else None for m in o.data.materials],'location':list(o.location),'scale':list(o.scale)})
+          mats=[]
+          image_nodes=[]
+          for m in bpy.data.materials:
+              entry={'name':m.name,'use_nodes':m.use_nodes,'diffuse_color':list(m.diffuse_color),'images':[]}
+              if m.use_nodes and m.node_tree:
+                  for n in m.node_tree.nodes:
+                      if n.type=='TEX_IMAGE':
+                          im=n.image
+                          info={'node':n.name,'image':im.name if im else None,'filepath':im.filepath if im else None,'packed':bool(im and im.packed_file),'size':list(im.size) if im else None,'has_pixels':bool(im and im.size[0]>0 and im.size[1]>0)}
+                          entry['images'].append(info); image_nodes.append({'material':m.name,**info})
+              mats.append(entry)
+          report={'source':src,'blender_version':bpy.app.version_string,'scene_objects':len(scene.objects),'mesh_count':len(meshes),'vertex_count':sum(len(o.data.vertices) for o in meshes),'triangle_count':sum(sum(max(0,len(p.vertices)-2) for p in o.data.polygons) for o in meshes),'material_count':len(mats),'materials':mats,'texture_nodes':len(image_nodes),'texture_nodes_loaded':sum(bool(x['image'] and x['has_pixels']) for x in image_nodes),'texture_nodes_missing':sum(not (x['image'] and x['has_pixels']) for x in image_nodes),'texture_links':image_nodes,'objects':objects}
+          if points:
+              report['bounds']={a:[min(getattr(p,a) for p in points),max(getattr(p,a) for p in points)] for a in 'xyz'}
+              report['dimensions']={a:report['bounds'][a][1]-report['bounds'][a][0] for a in 'xyz'}
+          try:
+              if not points: raise RuntimeError('GLB contains no mesh geometry')
+              lo=Vector([report['bounds'][a][0] for a in 'xyz']); hi=Vector([report['bounds'][a][1] for a in 'xyz'])
+              center=(lo+hi)*0.5; diag=max((hi-lo).length,1.0)
+              cd=bpy.data.cameras.new('BermudaAuditCamera'); cam=bpy.data.objects.new('BermudaAuditCamera',cd); scene.collection.objects.link(cam)
+              cam.location=center+Vector((1.35,-1.65,1.25)).normalized()*diag*1.65
+              cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler()
+              cd.lens=50; scene.camera=cam
+              ld=bpy.data.lights.new('BermudaAuditSun','SUN'); lo_obj=bpy.data.objects.new('BermudaAuditSun',ld); scene.collection.objects.link(lo_obj); lo_obj.rotation_euler=(0.45,-0.35,-0.4); ld.energy=2.0
+              scene.render.engine='BLENDER_EEVEE'
+              scene.render.resolution_x=1600; scene.render.resolution_y=1200; scene.render.resolution_percentage=100
+              scene.render.image_settings.file_format='PNG'; scene.render.filepath=os.path.abspath('audit/bermuda-remastered-preview.png')
+              scene.render.film_transparent=False
+              scene.world.color=(0.18,0.18,0.18)
+              bpy.ops.render.render(write_still=True)
+              report['preview']='audit/bermuda-remastered-preview.png'
+          except Exception as e:
+              report['preview_error']=str(e); report['traceback']=traceback.format_exc()[-4000:]
+          Path('audit/glb-scene-report.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+          print('BERMUDA_REPORT '+json.dumps({k:report.get(k) for k in ['mesh_count','vertex_count','triangle_count','material_count','texture_nodes','texture_nodes_loaded','texture_nodes_missing','bounds','dimensions','preview','preview_error']}))
+          PY
+          blender -b --python /tmp/inspect_bermuda.py 2>&1 | tee audit/blender-inspection.log
+      - name: Upload read-only audit and preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bermuda-remastered-full-map-audit
+          path: audit/
+          if-no-files-found: error
+          retention-days: 14
