@@ -5,7 +5,7 @@ extends CharacterBody3D
 @export var jump_velocity: float = 5.2
 @export var turn_speed: float = 11.0
 @export var camera_distance: float = 4.6
-@export var camera_height: float = 2.4
+@export var camera_height: float = 1.8
 
 @onready var visual: Node3D = $VisualRoot
 @onready var model: Node3D = $VisualRoot/FemalePlayer
@@ -45,7 +45,7 @@ func _find_ground_and_place() -> void:
 	query.exclude = [get_rid()]
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
-		global_position = hit.position + Vector3.UP * 0.98
+		global_position = hit.position + Vector3.UP * 0.70
 	else:
 		global_position = Vector3(0.0, 5.0, 0.0)
 
