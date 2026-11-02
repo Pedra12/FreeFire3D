@@ -52,7 +52,7 @@ jobs:
           if mtl:
             model_dir=obj.parent
             for tex in (root/'fragment').rglob('*'):
-              if tex.is_file() and tex.suffix.lower() in ('.png','.jpg','.jpeg','.tga'):
+              if tex.is_file() and tex.suffix.lower() in ('.png','.jpg','.jpeg','.tga','.bmp','.tif','.tiff','.webp'):
                 target=model_dir/tex.name
                 if not target.exists(): target.write_bytes(tex.read_bytes())
             expected=obj.parent/pathlib.Path(mtl_name).name
@@ -102,6 +102,17 @@ jobs:
           bpy.ops.wm.read_factory_settings(use_empty=True)
           import_obj()
           frag=[o for o in bpy.context.scene.objects if o.type=='MESH']
+          # Audit every imported image node and record whether Blender can resolve it.
+          texture_audit=[]
+          for mat in bpy.data.materials:
+            if not mat.use_nodes or not mat.node_tree: continue
+            for node in mat.node_tree.nodes:
+              if node.type=='TEX_IMAGE' and node.image:
+                image=node.image
+                path=bpy.path.abspath(image.filepath)
+                texture_audit.append({'material':mat.name,'image':image.name,'filepath':image.filepath,'resolved_path':path,'exists':pathlib.Path(path).exists(),'has_data':bool(image.has_data),'packed':bool(image.packed_file)})
+          pathlib.Path('audit/fragment-texture-audit.json').write_text(json.dumps(texture_audit,indent=2))
+          print('TEXTURE_AUDIT',json.dumps({'nodes':len(texture_audit),'loaded':sum(1 for x in texture_audit if x['has_data']),'missing':sum(1 for x in texture_audit if not x['exists'])}))
           # Ignore the giant backdrop/wall plane and retain map content inside full-map footprint.
           for o in frag:
             if o.name.startswith('Plane.003_Plane'): o.hide_render=True
