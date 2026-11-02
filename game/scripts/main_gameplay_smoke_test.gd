@@ -15,6 +15,17 @@ func _run_test() -> void:
 	current_scene = scene
 	await create_timer(2.4).timeout
 
+	var map_node := scene.get_node_or_null("Map") as Node3D
+	if map_node == null or not map_node.scene_file_path.ends_with("river_side.glb"):
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene is not using River Side")
+		quit(1)
+		return
+	var map_meshes := map_node.find_children("*", "MeshInstance3D", true, false)
+	if map_meshes.size() < 400:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: River Side geometry incomplete, meshes=%d" % map_meshes.size())
+		quit(1)
+		return
+
 	var bots := get_nodes_in_group("bots")
 	if bots.size() != 4:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: expected 4 bots, found %d" % bots.size())
@@ -54,5 +65,5 @@ func _run_test() -> void:
 		quit(1)
 		return
 
-	print("MAIN_GAMEPLAY_TEST_OK: bots=", bots.size(), " player_health=", hud_health, " bot_attack_verified=", hud_health < 90.0, " weapons=", bot_weapons + 1)
+	print("MAIN_GAMEPLAY_TEST_OK: map=RiverSide meshes=", map_meshes.size(), " bots=", bots.size(), " player_health=", hud_health, " bot_attack_verified=", hud_health < 90.0, " weapons=", bot_weapons + 1)
 	quit(0)
