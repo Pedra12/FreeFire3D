@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.append('/usr/lib/python3/dist-packages')
 from PIL import Image
+import numpy as np
 
 import bpy
 from mathutils import Vector
@@ -82,12 +83,25 @@ for image in list(bpy.data.images):
     if index not in extracted_images:
         continue
     path = extracted_images[index]
-    loaded = bpy.data.images.load(str(path), check_existing=False)
-    if not loaded.has_data:
-        loaded.reload()
-    if not loaded.has_data:
-        raise SystemExit(f"Could not decode extracted Olivia image {index}: {path}")
+    try:
+        with Image.open(path) as source_image:
+            source_image.load()
+            rgba = source_image.convert("RGBA").transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+            width, height = rgba.size
+            pixels = np.asarray(rgba, dtype=np.float32) / 255.0
+    except Exception as exc:
+        raise SystemExit(f"Could not decode extracted Olivia image {index}: {exc}")
+    loaded = bpy.data.images.new(
+        name=f"OliviaTexture_{index}", width=width, height=height, alpha=True, float_buffer=False
+    )
+    loaded.pixels.foreach_set(pixels.reshape(-1))
+    loaded.update()
+    loaded.filepath_raw = str(path)
+    loaded.file_format = "PNG"
+    loaded.save()
     loaded.pack()
+    if not loaded.has_data or loaded.size[0] <= 0 or loaded.size[1] <= 0:
+        raise SystemExit(f"Blender pixel datablock creation failed for Olivia image {index}")
     loaded_image_indices.add(index)
     loaded_images_by_index[index] = loaded
 
