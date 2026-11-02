@@ -1,0 +1,92 @@
+name: Olivia character rig audit
+
+on:
+  push:
+    paths:
+      - ".github/workflows/olivia-character-audit.yml"
+      - "olivia-free-fire.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-olivia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot 4.7.2
+        run: |
+          mkdir -p tools/godot
+          curl -L --fail --retry 3 "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip" -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d tools/godot
+          GODOT_BIN="$(find tools/godot -type f -name 'Godot_v4.7.2-stable_linux.x86_64' | head -n 1)"
+          test -n "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+      - name: Extract original Olivia model
+        run: |
+          mkdir -p game/assets/characters build
+          python3 - <<'PY'
+          import zipfile, pathlib, hashlib, json
+          zpath=pathlib.Path("olivia-free-fire.zip")
+          with zipfile.ZipFile(zpath) as z:
+              matches=[n for n in z.namelist() if n.endswith("olivia-free_fire.glb")]
+              if len(matches)!=1: raise SystemExit(f"Expected one Olivia GLB: {matches}")
+              data=z.read(matches[0])
+          out=pathlib.Path("game/assets/characters/olivia.glb")
+          out.write_bytes(data)
+          pathlib.Path("build/olivia-source.json").write_text(json.dumps({
+            "archive":str(zpath),"entry":matches[0],"bytes":len(data),
+            "sha256":hashlib.sha256(data).hexdigest()
+          },indent=2))
+          PY
+      - name: Import model and inspect rig and animations
+        run: |
+          "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/import.log
+          cat > game/inspect_olivia_audit.gd <<'GD'
+          extends SceneTree
+          func _initialize():
+              var packed = load("res://assets/characters/olivia.glb") as PackedScene
+              if packed == null:
+                  push_error("OLIVIA_LOAD_FAILED")
+                  quit(2)
+                  return
+              var root = packed.instantiate()
+              var report = {"loaded": true, "nodes": 0, "meshes": 0, "skeletons": [], "animation_players": [], "animation_libraries": []}
+              _walk(root, report)
+              print("OLIVIA_RIG_REPORT=", JSON.stringify(report))
+              if report["meshes"] == 0:
+                  push_error("OLIVIA_HAS_NO_MESHES")
+                  quit(3)
+                  return
+              quit(0)
+          func _walk(node: Node, report: Dictionary):
+              report["nodes"] += 1
+              if node is MeshInstance3D:
+                  report["meshes"] += 1
+              if node is Skeleton3D:
+                  report["skeletons"].append({"name":node.name,"bones":node.get_bone_count()})
+              if node is AnimationPlayer:
+                  var ap = node as AnimationPlayer
+                  var anims = []
+                  for anim_name in ap.get_animation_list():
+                      var anim = ap.get_animation(anim_name)
+                      anims.append({"name":anim_name,"length":anim.length,"tracks":anim.get_track_count()})
+                  report["animation_players"].append({"name":node.name,"animations":anims})
+              for child in node.get_children():
+                  _walk(child, report)
+          GD
+          "$GODOT_BIN" --headless --path game --script res://inspect_olivia_audit.gd 2>&1 | tee build/olivia-rig-report.log
+          grep "OLIVIA_RIG_REPORT=" build/olivia-rig-report.log
+      - name: Upload Olivia rig audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: olivia-character-rig-audit
+          path: |
+            build/olivia-source.json
+            build/import.log
+            build/olivia-rig-report.log
+          if-no-files-found: error
+          retention-days: 7
