@@ -78,10 +78,23 @@ jobs:
           chmod +x tools/godot/Godot_v4.7.2-stable_linux.x86_64
           echo "GODOT_BIN=$GITHUB_WORKSPACE/tools/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
 
-      - name: Import Clocktower and validate geometry, textures and collisions
+      - name: Import Clocktower in an isolated Godot project and validate interiors
         run: |
-          "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/clocktower/godot-import.log
-          cat > game/scripts/clocktower_map_audit.gd <<'GDSCRIPT'
+          mkdir -p build/clocktower/godot/assets/maps build/clocktower/godot/scripts
+          cp game/assets/maps/clocktower.glb build/clocktower/godot/assets/maps/
+          cp game/assets/maps/clocktower.glb.json build/clocktower/godot/assets/maps/
+          cat > build/clocktower/godot/project.godot <<'GODOT'
+          config_version=5
+
+          [application]
+          config/name="Clocktower Map Audit"
+
+          [rendering]
+          renderer/rendering_method="gl_compatibility"
+          renderer/rendering_method.mobile="gl_compatibility"
+          GODOT
+          "$GODOT_BIN" --headless --editor --path build/clocktower/godot --quit 2>&1 | tee build/clocktower/godot-import.log
+          cat > build/clocktower/godot/scripts/clocktower_map_audit.gd <<'GDSCRIPT'
           extends SceneTree
 
           func _initialize() -> void:
@@ -131,7 +144,7 @@ jobs:
                   if mesh_instance.get_child_count() > before:
                       collider_count += 1
 
-              var dimensions := max_point - min_point
+              var dimensions: Vector3 = max_point - min_point
               print("CLOCKTOWER_GEOMETRY meshes=", meshes.size(), " dimensions=", dimensions,
                   " textured_surfaces=", textured_surfaces, " colliders=", collider_count)
               if dimensions.x < 70.0 or dimensions.x > 100.0 or dimensions.y < 20.0 or dimensions.y > 35.0 or dimensions.z < 95.0 or dimensions.z > 130.0:
@@ -165,7 +178,7 @@ jobs:
                   "Zone_A_Mansion_LOD0_0",
                   "Tower_01_LOD0_0"
               ]
-              var buildings_with_floor := 0
+              var buildings_with_floor: int = 0
               for prefix in building_prefixes:
                   var selected: Dictionary = {}
                   for object_data in objects:
@@ -178,12 +191,12 @@ jobs:
                   var center_data: Array = selected.get("center", [0.0, 0.0, 0.0])
                   var minimum_data: Array = selected.get("bounds_min", [0.0, 0.0, 0.0])
                   var center := Vector3(float(center_data[0]), float(center_data[2]), float(center_data[1]))
-                  var floor_y := float(minimum_data[2])
+                  var floor_y: float = float(minimum_data[2])
                   var found_floor := false
                   for offset_x in [-2.0, 0.0, 2.0]:
                       for offset_z in [-2.0, 0.0, 2.0]:
-                          var sample_x := center.x + offset_x
-                          var sample_z := center.z + offset_z
+                          var sample_x: float = center.x + float(offset_x)
+                          var sample_z: float = center.z + float(offset_z)
                           var query := PhysicsRayQueryParameters3D.create(
                               Vector3(sample_x, floor_y + 1.4, sample_z),
                               Vector3(sample_x, floor_y - 0.35, sample_z)
@@ -205,10 +218,10 @@ jobs:
                   quit(5)
                   return
               print("CLOCKTOWER_MAP_AUDIT_OK: meshes=", meshes.size(), " textures=", textured_surfaces,
-                  " colliders=", collider_count, " interior_floors=", interior_hits)
+                  " colliders=", collider_count, " interior_floors=", buildings_with_floor)
               quit(0)
           GDSCRIPT
-          "$GODOT_BIN" --headless --path game --script res://scripts/clocktower_map_audit.gd 2>&1 | tee build/clocktower/map-audit.log
+          "$GODOT_BIN" --headless --path build/clocktower/godot --script res://scripts/clocktower_map_audit.gd 2>&1 | tee build/clocktower/map-audit.log
           grep "CLOCKTOWER_MAP_AUDIT_OK" build/clocktower/map-audit.log
 
       - name: Upload Clocktower map validation package
