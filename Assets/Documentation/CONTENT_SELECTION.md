@@ -10,7 +10,7 @@ This branch is a standalone Unity project. Godot scenes, scripts, imported resou
 | Match map | Clocktower, one environment | `SourceArchives/free-fire-clocktower-3d-model-by-rs-ratul.zip` | `Assets/Game/Maps/Clocktower/` |
 | Humanoid animation source | Quaternius Universal Animation Library Standard, in-place FBX | `SourceArchives/quaternius-universal-animation-library-standard.zip` | `Assets/Game/Animations/Quaternius/` |
 
-Olivia is the only playable character and Clocktower is the only selected map for the first vertical slice. The Quaternius FBX is an animation-donor rig only: its mesh is disabled during Unity import and must never be instantiated as a second player character.
+Olivia is the only playable character and Clocktower is the only selected map for the first vertical slice. The Quaternius FBX is an animation-donor rig only: its renderer components are stripped by the Unity import postprocessor and it must never be instantiated as a second player character.
 
 ## Import gate
 
