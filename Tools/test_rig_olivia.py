@@ -315,6 +315,10 @@ bpy.context.view_layer.update()
 if deformation < 0.0001:
     raise SystemExit("Rig pose test produced no measurable mesh deformation.")
 
+scale_factor = 1.78 / height
+armature.scale = (scale_factor, scale_factor, scale_factor)
+bpy.context.view_layer.update()
+
 # Keep only the rig and skinned meshes in the exported GLB.
 for obj in list(bpy.context.scene.objects):
     if obj.type not in {"MESH", "ARMATURE"}:
@@ -386,7 +390,7 @@ report = {
     "rigging_method": "manual_segment_distance_weights_v1",
     "source_model": glb_name,
     "source_height_m": round(height, 3),
-    "export_scale_factor": round(1.78 / height, 6),
+    "export_scale_factor": round(scale_factor, 6),
     "target_height_m": round(reimport_height, 3),
     "source_meshes": source_mesh_count,
     "reimport_meshes": len(reimport_meshes),
