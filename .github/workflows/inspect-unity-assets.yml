@@ -5,6 +5,7 @@ on:
     paths:
       - 'optionalab_*'
       - 'shaders.*'
+      - '*.zip'
       - '.github/workflows/inspect-unity-assets.yml'
   workflow_dispatch:
 
@@ -15,105 +16,120 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install UnityPy
         run: python -m pip install --upgrade pip UnityPy
-      - name: Inventory and inspect bundles
+      - name: Decode bundles, export readable assets and build evidence report
         run: |
           cat > inspect_bundles.py <<'PY'
-          import os, json, hashlib, zipfile, collections, traceback
+          import os, json, hashlib, zipfile, collections, re
           import UnityPy
 
-          roots = [".", "/tmp/nested"]
-          os.makedirs("/tmp/nested", exist_ok=True)
-          report = {"files": [], "totals": collections.Counter(), "notes": []}
-          candidates = []
-          for root in roots[:1]:
-              for base, dirs, files in os.walk(root):
-                  dirs[:] = [d for d in dirs if d not in [".git", ".github"]]
-                  for name in files:
-                      path = os.path.join(base, name)
-                      if path == __file__ or name.endswith((".pyc",)):
-                          continue
-                      if name.startswith(("optionalab_", "shaders.")) or name.lower().endswith((".bundle",".assetbundle",".assets",".zip",".obb")):
-                          candidates.append(path)
+          OUT = "unity_asset_export"
+          os.makedirs(OUT, exist_ok=True)
+          report = {"bundles": [], "archives": [], "totals": {}, "evidence": {}}
+          targets = []
+          metadata = []
 
-          def inspect(path, label=None):
-              item = {"path": label or path, "bytes": os.path.getsize(path)}
-              with open(path, "rb") as f:
-                  head = f.read(32)
-              item["header_ascii"] = "".join(chr(x) if 32 <= x < 127 else "." for x in head)
-              item["sha256"] = hashlib.sha256(open(path,"rb").read()).hexdigest()
+          def safe(s):
+              s = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(s or "unnamed"))
+              return s[:100] or "unnamed"
+
+          for name in os.listdir("."):
+              if name.startswith(("optionalab_", "shaders.")) and os.path.isfile(name):
+                  targets.append(name)
+              if name.lower().endswith((".zip", ".obb")):
+                  try:
+                      with zipfile.ZipFile(name) as z:
+                          entries = [i.filename for i in z.infolist() if not i.is_dir()]
+                          report["archives"].append({"path": name, "entries": len(entries), "integrity": "OK" if z.testzip() is None else "BAD", "files": entries[:150]})
+                          for info in z.infolist():
+                              base = os.path.basename(info.filename)
+                              if base == "global-metadata.dat" or base.endswith("global-metadata.dat"):
+                                  dest = os.path.join(OUT, safe(name) + "_" + base)
+                                  with z.open(info) as src, open(dest, "wb") as dst:
+                                      dst.write(src.read())
+                                  metadata.append(dest)
+                              if not info.is_dir() and (base.startswith(("optionalab_", "shaders."))):
+                                  dest = os.path.join(OUT, safe(name) + "_" + base)
+                                  with z.open(info) as src, open(dest, "wb") as dst:
+                                      dst.write(src.read())
+                                  targets.append(dest)
+                  except Exception as e:
+                      report["archives"].append({"path": name, "error": repr(e)})
+
+          totals = collections.Counter()
+          for path in dict.fromkeys(targets):
+              item = {"path": path, "bytes": os.path.getsize(path)}
+              raw = open(path, "rb").read()
+              item["sha256"] = hashlib.sha256(raw).hexdigest()
+              item["header_hex"] = raw[:24].hex()
+              item["header_ascii"] = "".join(chr(x) if 32 <= x < 127 else "." for x in raw[:32])
               try:
                   env = UnityPy.load(path)
                   counts = collections.Counter()
-                  examples = collections.defaultdict(list)
+                  names = collections.defaultdict(list)
                   for obj in env.objects:
-                      try:
-                          typ = obj.type.name
-                          counts[typ] += 1
-                          if len(examples[typ]) < 12:
+                      typ = obj.type.name
+                      counts[typ] += 1
+                      totals[typ] += 1
+                      if typ in ("Mesh", "SkinnedMeshRenderer", "MeshRenderer", "Animator", "AnimationClip", "Texture2D", "GameObject", "Material", "TerrainData", "SceneAsset", "Avatar"):
+                          try:
                               data = obj.read()
-                              name = getattr(data, "m_Name", "") or getattr(data, "name", "")
-                              examples[typ].append(str(name)[:120])
-                      except Exception as e:
-                          counts["READ_ERROR"] += 1
-                  item["unitypy_loaded"] = True
+                              nm = getattr(data, "m_Name", "") or getattr(data, "name", "") or ""
+                              if len(names[typ]) < 100:
+                                  names[typ].append(str(nm)[:150])
+                              if typ == "Texture2D":
+                                  try:
+                                      img = data.image
+                                      if img:
+                                          img.save(os.path.join(OUT, safe(nm) + ".png"))
+                                  except Exception as e:
+                                      item.setdefault("export_errors", []).append("texture " + str(nm) + ": " + repr(e)[:160])
+                              elif typ == "Mesh":
+                                  try:
+                                      mesh = data.export()
+                                      with open(os.path.join(OUT, safe(nm) + ".obj"), "w", encoding="utf-8", newline="") as f:
+                                          f.write(mesh)
+                                  except Exception as e:
+                                      item.setdefault("export_errors", []).append("mesh " + str(nm) + ": " + repr(e)[:160])
+                          except Exception as e:
+                              item.setdefault("read_errors", []).append(typ + ": " + repr(e)[:160])
+                  item["loaded"] = True
                   item["object_counts"] = dict(counts)
-                  item["examples"] = dict(examples)
-                  for typ, n in counts.items():
-                      report["totals"][typ] += n
+                  item["object_names"] = dict(names)
+                  item["container_paths"] = list(getattr(env, "container", {}).keys())[:200]
               except Exception as e:
-                  item["unitypy_loaded"] = False
-                  item["error"] = repr(e)[:500]
-              report["files"].append(item)
-              if path.lower().endswith(".zip") or head[:2] == b"PK":
-                  try:
-                      with zipfile.ZipFile(path) as z:
-                          bad = z.testzip()
-                          item["zip_integrity"] = "OK" if bad is None else "BAD:" + bad
-                          item["zip_entries"] = len(z.infolist())
-                          for info in z.infolist():
-                              if not info.is_dir() and info.file_size < 500_000_000:
-                                  out = os.path.join("/tmp/nested", os.path.basename(info.filename))
-                                  with z.open(info) as src, open(out,"wb") as dst:
-                                      dst.write(src.read())
-                                  candidates.append(out)
-                  except Exception as e:
-                      item["zip_error"] = repr(e)[:300]
+                  item["loaded"] = False
+                  item["error"] = repr(e)[:1000]
+                  m = re.search(r"key_sig = (b'.*?'), data_sig = (b'.*?'),and fp", item["error"])
+                  if m:
+                      item["decrypt_signature"] = {"key_sig": m.group(1), "data_sig": m.group(2)}
+              report["bundles"].append(item)
 
-          seen = set()
-          i = 0
-          while i < len(candidates):
-              path = candidates[i]; i += 1
-              if path in seen or not os.path.isfile(path): continue
-              seen.add(path)
-              inspect(path)
-              if i > 1000: break
-
-          report["totals"] = dict(report["totals"])
-          report["notes"] = [
-            "Mesh, SkinnedMeshRenderer, Animator and AnimationClip indicate model rigging/animation data.",
-            "Texture2D indicates textures; TerrainData/SceneAsset and large meshes may indicate map assets.",
-            "Names and object counts are evidence; visual usability still requires export and inspection."
-          ]
-          with open("unity_asset_report.json","w") as f:
-              json.dump(report,f,indent=2)
-          with open("unity_asset_report.txt","w") as f:
-              f.write("Unity AssetBundle inspection report\n")
-              f.write(json.dumps(report,indent=2))
-          print(json.dumps(report,indent=2))
+          report["totals"] = dict(totals)
+          report["evidence"] = {
+            "character_related_names": ["Male_", "Female_", "Cos_", "Hair_", "UMADynamicBone"],
+            "rigging_animation_types": ["SkinnedMeshRenderer", "Animator", "AnimationClip", "Avatar", "Transform"],
+            "map_related_types": ["TerrainData", "SceneAsset", "Mesh", "Texture2D"],
+            "metadata_files_found": metadata,
+            "interpretation": "Counts and object names are direct UnityPy reads. No object type is inferred from a filename."
+          }
+          with open("unity_asset_report.json", "w") as f:
+              json.dump(report, f, indent=2)
+          with open("unity_asset_report.txt", "w") as f:
+              f.write(json.dumps(report, indent=2))
+          print(json.dumps(report, indent=2))
           PY
           python inspect_bundles.py
-      - name: Upload inspection report
+      - name: Upload full inspection and extracted assets
         uses: actions/upload-artifact@v4
         with:
-          name: unity-asset-inspection
+          name: unity-asset-inspection-full
           path: |
             unity_asset_report.json
             unity_asset_report.txt
+            unity_asset_export/
