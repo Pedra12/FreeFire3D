@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/maps/river_side.glb" id="1_map"]
 [ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="2_collisions"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="4_hud"]
 [ext_resource type="Script" path="res://scripts/bot_spawner.gd" id="5_spawner"]
 [ext_resource type="PackedScene" path="res://scenes/bot.tscn" id="6_bot"]
+[ext_resource type="Script" path="res://scripts/explorable_house.gd" id="7_house"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMaterial_main"]
 sky_top_color = Color(0.12, 0.28, 0.48, 1)
@@ -51,8 +52,12 @@ collision_mask = 1
 [node name="CollisionShape3D" type="CollisionShape3D" parent="SafeGround"]
 shape = SubResource("SafeGround_shape")
 
+[node name="ExploreHouse" type="Node3D" parent="."]
+position = Vector3(12, 0, 12)
+script = ExtResource("7_house")
+
 [node name="Player" parent="." instance=ExtResource("3_player")]
-position = Vector3(0, 1.5, 0)
+position = Vector3(12, 0.8, 5.0)
 
 [node name="MobileHUD" type="Control" parent="."]
 anchors_preset = 15
