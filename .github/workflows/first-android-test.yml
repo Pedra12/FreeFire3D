@@ -166,11 +166,13 @@ jobs:
         run: |
           mkdir -p build
           "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-Bermuda-Survival.apk" 2>&1 | tee build/android-export.log
-          test -s build/FreeFire3D-Player-Prototype.apk
-          unzip -t build/FreeFire3D-Player-Prototype.apk
-          "$ANDROID_HOME/build-tools/36.1.0/aapt" dump badging build/FreeFire3D-Player-Prototype.apk | tee build/apk-badging.txt
-          unzip -l build/FreeFire3D-Player-Prototype.apk | grep -E 'lib/arm64-v8a/.*\.so' | tee build/apk-native-libraries.txt
-          sha256sum build/FreeFire3D-Player-Prototype.apk | tee build/apk-sha256.txt
+          test -s build/FreeFire3D-Bermuda-Survival.apk
+          unzip -t build/FreeFire3D-Bermuda-Survival.apk
+          AAPT_BIN="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$AAPT_BIN"
+          "$AAPT_BIN" dump badging build/FreeFire3D-Bermuda-Survival.apk | tee build/apk-badging.txt
+          unzip -l build/FreeFire3D-Bermuda-Survival.apk | grep -E 'lib/arm64-v8a/.*\.so' | tee build/apk-native-libraries.txt
+          sha256sum build/FreeFire3D-Bermuda-Survival.apk | tee build/apk-sha256.txt
 
       - name: Upload Android player prototype and diagnostics
         if: always()
