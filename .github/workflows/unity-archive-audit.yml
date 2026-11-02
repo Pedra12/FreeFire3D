@@ -1,0 +1,23 @@
+name: Audit approved 3D source archives
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "SourceArchives/**"
+      - "Tools/audit_source_archives.py"
+      - ".github/workflows/unity-archive-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated Unity project
+        uses: actions/checkout@v4
+      - name: Inspect archive integrity and asset inventory
+        run: python3 Tools/audit_source_archives.py
