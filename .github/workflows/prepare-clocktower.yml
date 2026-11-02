@@ -1,0 +1,37 @@
+name: Prepare canonical Clocktower asset
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "Tools/prepare_clocktower.py"
+      - ".github/workflows/prepare-clocktower.yml"
+      - "SourceArchives/free-fire-clocktower-3d-model-by-rs-ratul.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated Unity project
+        uses: actions/checkout@v4
+      - name: Install Blender and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy
+      - name: Convert the one approved Clocktower FBX to a self-contained GLB
+        run: blender --background --python Tools/prepare_clocktower.py -- "$GITHUB_WORKSPACE"
+      - name: Commit the single canonical map asset
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/Game/Maps/Clocktower/Clocktower.glb Assets/Game/Maps/Clocktower/AssetImportReport.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Import single canonical Clocktower GLB"
+            git push
+          fi
