@@ -173,14 +173,14 @@ def main():
         resource_ids[map_name] = resource_id
         material_lines.insert(-1, f'[ext_resource type="Texture2D" path="{relative}" id="{resource_id}"]')
     material_lines[0] = f'[gd_resource type="StandardMaterial3D" load_steps={1 + len(resource_ids)} format=3]'
-    material_lines.extend(["[resource]", f'albedo_texture = ExtResource("{resource_ids["basecolor"]}")', "roughness = 0.92", "metallic = 0.0", "uv1_scale = Vector3(22, 22, 1)'])
+    material_lines.extend(["[resource]", f'albedo_texture = ExtResource("{resource_ids["basecolor"]}")', "roughness = 0.92", "metallic = 0.0", "uv1_scale = Vector3(22, 22, 1)"])
     if "normal" in resource_ids:
         material_lines.extend(["normal_enabled = true", f'normal_texture = ExtResource("{resource_ids["normal"]}")', "normal_scale = 0.72"])
     if "roughness" in resource_ids:
         material_lines.append(f'roughness_texture = ExtResource("{resource_ids["roughness"]}")')
     if "ao" in resource_ids:
         material_lines.extend(["ao_enabled = true", f'ao_texture = ExtResource("{resource_ids["ao"]}")'])
-    (OUT / "ground_material.tres").write_text("\\n".join(material_lines) + "\\n", encoding="utf-8")
+    (OUT / "ground_material.tres").write_text("\n".join(material_lines) + "\n", encoding="utf-8")
     print("GODOT_GROUND_MATERIAL_OK", str(OUT / "ground_material.tres"), "maps", ",".join(resource_ids))
 
     (OUT / "ASSET_CREDITS.txt").write_text(
