@@ -172,22 +172,22 @@ for obj in meshes:
 
 # Test a small pose change and verify that the skinned mesh actually deforms.
 bpy.context.view_layer.update()
-test_mesh = meshes[0]
+test_mesh = max(meshes, key=lambda obj: len(obj.data.vertices))
 depsgraph = bpy.context.evaluated_depsgraph_get()
 evaluated = test_mesh.evaluated_get(depsgraph)
 evaluated_mesh = evaluated.to_mesh()
-before = [evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices[:100]]
+before = [evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices]
 evaluated.to_mesh_clear()
 pose_bone = armature.pose.bones.get("LeftUpperArm")
 if pose_bone is None:
     raise SystemExit("LeftUpperArm bone missing after rig creation.")
 pose_bone.rotation_mode = "XYZ"
-pose_bone.rotation_euler[1] = 0.12
+pose_bone.rotation_euler[0] = 0.12
 bpy.context.view_layer.update()
 depsgraph = bpy.context.evaluated_depsgraph_get()
 evaluated = test_mesh.evaluated_get(depsgraph)
 evaluated_mesh = evaluated.to_mesh()
-after = [evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices[:100]]
+after = [evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices]
 evaluated.to_mesh_clear()
 deformation = max(((a-b).length for a, b in zip(before, after)), default=0.0)
 pose_bone.rotation_euler = (0.0, 0.0, 0.0)
