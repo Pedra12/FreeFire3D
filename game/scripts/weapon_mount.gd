@@ -11,16 +11,45 @@ extends Node3D
 @export var hand_offset: Vector3 = Vector3(0.02, -0.22, 0.24)
 @export var hand_rotation_degrees: Vector3 = Vector3(0.0, -90.0, 0.0)
 
+const WEAPON_CATALOG := {
+	&"awm": {"path": "res://assets/weapons/awm_free_fire.glb", "length": 0.82},
+	&"assault_rifle": {"path": "res://assets/weapons/assault_rifle.glb", "length": 0.83},
+	&"smg": {"path": "res://assets/weapons/smg.glb", "length": 0.45},
+	&"shotgun": {"path": "res://assets/weapons/shotgun.glb", "length": 0.92},
+	&"pistol": {"path": "res://assets/weapons/pistol.glb", "length": 0.20}
+}
+
 var mounted_weapon: Node3D
+var weapon_attachment: BoneAttachment3D
+var current_weapon_id: StringName = &"awm"
 
 func _ready() -> void:
 	call_deferred("_attach_weapon")
 
+func equip_weapon(weapon_id: StringName) -> bool:
+	if not WEAPON_CATALOG.has(weapon_id):
+		push_warning("WEAPON_MOUNT: unknown weapon " + String(weapon_id))
+		return false
+	var config: Dictionary = WEAPON_CATALOG[weapon_id]
+	var next_path: String = String(config["path"])
+	if not FileAccess.file_exists(next_path):
+		push_warning("WEAPON_MOUNT: missing model " + next_path)
+		return false
+	current_weapon_id = weapon_id
+	weapon_path = next_path
+	target_weapon_length = float(config["length"])
+	call_deferred("_attach_weapon")
+	return true
+
 func _attach_weapon() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 	var character := get_parent()
-	var model := character.get_node_or_null("VisualRoot/FemalePlayer") as Node3D
+	var model: Node3D = character.get_node_or_null("VisualRoot/Olivia") as Node3D
+	if model == null:
+		model = character.get_node_or_null("VisualRoot/FemalePlayer") as Node3D
 	if model == null:
 		model = character.get_node_or_null("VisualRoot/CharacterModel") as Node3D
 	if model == null:
@@ -54,14 +83,17 @@ func _attach_weapon() -> void:
 	var largest_dimension := 0.0
 	for item in mesh_nodes:
 		var mesh := item as MeshInstance3D
-		var bounds := mesh.get_aabb()
-		var extent := bounds.size
+		if mesh.mesh == null:
+			continue
+		var extent := mesh.get_aabb().size
 		largest_dimension = maxf(largest_dimension, maxf(extent.x, maxf(extent.y, extent.z)))
 	if largest_dimension <= 0.000001:
 		weapon.queue_free()
 		push_warning("WEAPON_MOUNT: weapon geometry has no measurable bounds")
 		return
 
+	if is_instance_valid(weapon_attachment):
+		weapon_attachment.queue_free()
 	var attachment := BoneAttachment3D.new()
 	attachment.name = "RightHandWeaponAttachment"
 	attachment.bone_name = selected_bone
@@ -70,5 +102,6 @@ func _attach_weapon() -> void:
 	attachment.rotation_degrees = hand_rotation_degrees
 	weapon.scale = Vector3.ONE * (target_weapon_length / largest_dimension)
 	attachment.add_child(weapon)
+	weapon_attachment = attachment
 	mounted_weapon = weapon
-	print("WEAPON_MOUNT_OK bone=", selected_bone, " scale=", weapon.scale, " meshes=", mesh_nodes.size())
+	print("WEAPON_MOUNT_OK id=", current_weapon_id, " bone=", selected_bone, " scale=", weapon.scale, " meshes=", mesh_nodes.size())
