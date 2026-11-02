@@ -1,0 +1,1 @@
+Trigger read-only full map and Clocktower alignment test.
