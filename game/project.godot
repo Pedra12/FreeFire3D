@@ -1,7 +1,7 @@
 config_version=5
 
 [application]
-config/name="FreeFire3D - River Side 4v4"
+config/name="FreeFire3D - Clocktower 4v4"
 config/icon="res://icon.svg"
 run/main_scene="res://scenes/main.tscn"
 
