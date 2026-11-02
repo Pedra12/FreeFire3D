@@ -21,7 +21,7 @@ This folder is the new Unity project. The existing Godot implementation remains 
 
 ## Build environment
 
-Unity Editor version is pinned in `ProjectSettings/ProjectVersion.txt`. An automated Android build also needs a valid Unity Personal/Plus/Pro license activation in the CI environment. No APK should be claimed until the licensed Unity build succeeds and the artifact is verified.
+Unity Editor version is pinned to 6000.0.23f1 in `ProjectSettings/ProjectVersion.txt`, matching the URP 17.0.3 package selection. An automated Android build also needs a valid Unity Personal/Plus/Pro license activation in the CI environment. No APK should be claimed until the licensed Unity build succeeds and the artifact is verified.
 
 ## Current status
 
