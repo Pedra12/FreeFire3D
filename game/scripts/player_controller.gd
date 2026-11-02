@@ -4,8 +4,8 @@ extends CharacterBody3D
 @export var sprint_speed: float = 7.2
 @export var jump_velocity: float = 5.2
 @export var turn_speed: float = 11.0
-@export var camera_distance: float = 4.6
-@export var camera_height: float = 1.8
+@export var camera_distance: float = 3.4
+@export var camera_height: float = 1.65
 
 @onready var visual: Node3D = $VisualRoot
 @onready var model: Node3D = $VisualRoot/FemalePlayer
@@ -33,6 +33,7 @@ func _ready() -> void:
 	camera.current = true
 	camera_pivot.position = Vector3(0.0, camera_height, 0.0)
 	camera.position = Vector3(0.0, 0.0, camera_distance)
+	camera.fov = 65.0
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	await _find_ground_and_place()
@@ -132,7 +133,7 @@ func _physics_process(delta: float) -> void:
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	camera.position = camera.position.lerp(Vector3(0.0, 0.0, camera_distance), 1.0 - exp(-8.0 * delta))
-	camera.look_at(camera_pivot.global_position + (-camera_pivot.global_transform.basis.z * 5.0), Vector3.UP)
+	camera.look_at(global_position + Vector3.UP * 1.15, Vector3.UP)
 
 func play_action_animation(animation_name: StringName) -> void:
 	if animation_player == null or not animation_player.has_animation(animation_name):
