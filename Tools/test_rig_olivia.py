@@ -60,6 +60,7 @@ for index, image in enumerate(gltf_json.get("images", [])):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images), flush=True)
+loaded_image_indices = set()
 for image in bpy.data.images:
     match = re.search(r"Image[_ ]?(\d+)", image.name)
     if not match:
@@ -73,11 +74,20 @@ for image in bpy.data.images:
     if not loaded.has_data:
         raise SystemExit(f"Could not decode extracted Olivia image {index}")
     loaded.pack()
+    loaded_image_indices.add(index)
     for material in bpy.data.materials:
         if material.use_nodes and material.node_tree:
             for node in material.node_tree.nodes:
                 if node.type == "TEX_IMAGE" and node.image == image:
                     node.image = loaded
+if loaded_image_indices != set(extracted_images.keys()):
+    raise SystemExit(f"Not all embedded Olivia images were loaded: {sorted(loaded_image_indices)}")
+for material in bpy.data.materials:
+    if material.use_nodes and material.node_tree:
+        for node in material.node_tree.nodes:
+            if node.type == "TEX_IMAGE" and node.image and not node.image.has_data:
+                raise SystemExit(f"Olivia material image still has no pixels: {node.image.name}")
+
 meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 if len(meshes) != 7:
     raise SystemExit(f"Unexpected Olivia mesh count: {len(meshes)}")
