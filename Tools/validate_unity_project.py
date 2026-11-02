@@ -105,6 +105,8 @@ if olivia_model.exists():
                     "Olivia GLB must preserve the seven source meshes.")
             require(report.get("source_meshes", 0) <= report.get("reimport_meshes", 0) <= report.get("source_meshes", 0) + 2,
                     "Olivia GLB round-trip produced an unexpected number of mesh primitives.")
+            require(report.get("reimport_skinned_meshes", 0) >= report.get("source_meshes", 0),
+                    "Olivia GLB round-trip retained too few skinned mesh objects.")
             require(report.get("armature_bones", 0) >= 15,
                     "Olivia rig report contains too few humanoid bones.")
             require(report.get("glb_skins") == 1,
