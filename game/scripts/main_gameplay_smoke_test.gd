@@ -15,6 +15,18 @@ func _run_test() -> void:
 	current_scene = scene
 	await create_timer(2.4).timeout
 
+	var safe_ground := scene.get_node_or_null("SafeGround") as StaticBody3D
+	if safe_ground == null or safe_ground.get_node_or_null("CollisionShape3D") == null:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: safe ground collider missing")
+		quit(1)
+		return
+
+	var player_spawn := scene.get_node("Player") as CharacterBody3D
+	if player_spawn.global_position.y > 4.0 or not player_spawn.is_on_floor():
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: player did not settle on ground y=%.2f grounded=%s" % [player_spawn.global_position.y, player_spawn.is_on_floor()])
+		quit(1)
+		return
+
 	var map_node := scene.get_node_or_null("Map") as Node3D
 	if map_node == null or not map_node.scene_file_path.ends_with("river_side.glb"):
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene is not using River Side")
