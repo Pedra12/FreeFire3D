@@ -19,7 +19,7 @@ jobs:
       - name: Install Blender
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender
+          sudo apt-get install -y blender libegl1
       - name: Extract assets
         run: |
           mkdir -p /tmp/assets audit/previews audit/logs
@@ -37,7 +37,8 @@ jobs:
                     p=root/(re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+i.filename)); p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(data)
             except Exception as e: print('EXTRACT_ERROR',label,str(e))
           for p in pathlib.Path('.').iterdir():
-            if p.suffix.lower() in ('.zip','.usdz'): walk(p.stem,p.read_bytes())
+            if p.suffix.lower()=='.usdz': (root/p.name).write_bytes(p.read_bytes())
+            elif p.suffix.lower()=='.zip': walk(p.stem,p.read_bytes())
           print('\n'.join(str(p) for p in root.rglob('*') if p.is_file()))
           PY
       - name: Inspect and render Blender files
