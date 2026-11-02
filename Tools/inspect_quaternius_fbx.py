@@ -63,6 +63,6 @@ report = {
     "required_locomotion_actions": sorted(required_groups),
     "missing_required_actions": missing,
 }
-OUT.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
+OUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 print("QUATERNIUS_FBX_INSPECTION_OK")
 print(json.dumps(report, indent=2))
