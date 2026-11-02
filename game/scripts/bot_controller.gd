@@ -205,7 +205,12 @@ func _show_damage_number(amount: float, at: Vector3) -> void:
 	label.modulate = Color(1.0, 0.84, 0.32, 1.0)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
-	get_tree().current_scene.add_child(label)
+	var effects_root: Node = get_tree().current_scene
+	if effects_root == null:
+		effects_root = get_parent()
+	if effects_root == null:
+		return
+	effects_root.add_child(label)
 	label.global_position = at + Vector3.UP * 0.3
 	var tween := label.create_tween()
 	tween.tween_property(label, "position:y", label.position.y + 0.9, 0.55)
