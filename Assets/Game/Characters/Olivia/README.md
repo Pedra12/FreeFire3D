@@ -2,8 +2,21 @@
 
 This is the only approved player-character slot in the Unity project.
 
-The selected source archive contains exactly one model: `source/olivia-free_fire.glb`, with its textures embedded. Structural inspection of the GLB reports 7 meshes, 7 materials, 10 images, **zero skins and zero animation clips**. The model is therefore not rigged and cannot yet be driven by the TPS Animator.
+## Canonical model
 
-Keep this exact Olivia as the sole canonical character. The next character-art task is to create a proper humanoid armature and skin weights for this model, then validate deformation before connecting locomotion, jump, aim and weapon animations. Do not add another Olivia model as a parallel version.
+- Model: `Olivia.glb`
+- Rig report: `OliviaRigReport.json`
+- Humanoid Avatar asset: `OliviaAvatar.asset` (created by the Unity Editor after the GLB imports)
+- Source archive: `SourceArchives/olivia-free-fire.zip`
 
-The source appears to match the Sketchfab model “Olivia free fire” by Xman (17.7k triangles), listed under CC Attribution. Preserve the creator credit and license notice in the game credits: https://sketchfab.com/3d-models/olivia-free-fire-827a430d43e048dc9c13724f934210cf. Confirm the archive-to-page match before public distribution.\n\nThe GLB has not yet been imported into Unity. glTFast 6.20.0 is pinned in the package manifest to import GLB files into Unity assets.
+The source GLB contains seven meshes but no armature, skin or animation clips. The preparation pipeline creates one humanoid skeleton, assigns four normalized bone influences per vertex, tests pose deformation, exports one skinned GLB and re-imports it to verify that the skin survives.
+
+The original source model is not retained as a second playable model. It remains only inside the source archive.
+
+## Unity import
+
+`OliviaAvatarAssetBuilder.cs` uses Unity's `AvatarBuilder.BuildHumanAvatar` to construct and validate the Humanoid Avatar from the imported skeleton. The editor must confirm `Avatar.isValid` and `Avatar.isHuman` before the Match scene builder creates the player.
+
+## Current limitation
+
+A Blender deformation test does not replace Unity animation testing. The final Avatar mapping, retargeted locomotion, weapon-hold pose, jump, crouch and Android performance still require validation in Unity.
