@@ -1,7 +1,7 @@
 [gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/player_controller.gd" id="1_controller"]
-[ext_resource type="PackedScene" path="res://assets/characters/female_player_rigged.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/characters/olivia_rigged.glb" id="2_model"]
 [ext_resource type="Script" path="res://scripts/combat_controller.gd" id="3_combat"]
 [ext_resource type="Script" path="res://scripts/player_health.gd" id="4_health"]
 [ext_resource type="Script" path="res://scripts/weapon_mount.gd" id="5_weapon"]
@@ -23,7 +23,7 @@ shape = SubResource("Capsule_player")
 
 [node name="VisualRoot" type="Node3D" parent="."]
 
-[node name="FemalePlayer" parent="VisualRoot" instance=ExtResource("2_model")]
+[node name="Olivia" parent="VisualRoot" instance=ExtResource("2_model")]
 scale = Vector3(0.75, 0.75, 0.75)
 
 [node name="CameraPivot" type="Node3D" parent="."]
