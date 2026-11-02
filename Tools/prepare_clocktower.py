@@ -89,6 +89,32 @@ for image in bpy.data.images:
 if missing:
     raise SystemExit("Clocktower has unresolved textures: " + ", ".join(sorted(set(missing))))
 
+# FBX import creates image datablocks with stale Windows paths but no loaded pixels.
+# Load the verified archive files explicitly and replace each material node's image reference.
+for material in bpy.data.materials:
+    if not material.use_nodes or material.node_tree is None:
+        continue
+    for node in material.node_tree.nodes:
+        if node.type != "TEX_IMAGE" or node.image is None:
+            continue
+        old_image = node.image
+        candidate = Path(old_image.filepath)
+        if not candidate.is_file():
+            requested = candidate.name
+            stem = Path(requested).stem.lower()
+            matches = [p for p in texture_root.iterdir() if p.is_file()
+                       and (p.stem.lower().startswith(stem) or stem.startswith(p.stem.lower()))]
+            if len(matches) == 1:
+                candidate = matches[0]
+            elif len(matches) > 1:
+                hashes = {hashlib.sha256(p.read_bytes()).hexdigest() for p in matches}
+                if len(hashes) == 1:
+                    candidate = sorted(matches)[0]
+        if not candidate.is_file():
+            raise SystemExit(f"Texture file not found for material {material.name}: {old_image.filepath}")
+        loaded_image = bpy.data.images.load(str(candidate), check_existing=True)
+        node.image = loaded_image
+
 used_images = set()
 for material in bpy.data.materials:
     if not material.use_nodes or material.node_tree is None:
@@ -99,7 +125,9 @@ for material in bpy.data.materials:
         ):
             used_images.add(node.image)
 for image in used_images:
-    if image.source == "FILE" and image.has_data:
+    if not image.has_data or image.size[0] <= 0 or image.size[1] <= 0:
+        raise SystemExit(f"Texture image has no decoded pixels: {image.name}")
+    if image.source == "FILE":
         image.pack()
 print(f"UNIQUE_USED_TEXTURE_IMAGES={len(used_images)}", flush=True)
 for image in sorted(used_images, key=lambda x: x.name):
