@@ -23,7 +23,7 @@ func _audit() -> void:
 		var mesh_node := item as MeshInstance3D
 		if mesh_node.mesh == null:
 			continue
-		var bounds := mesh_node.get_transformed_aabb()
+		var bounds: AABB = mesh_node.get_transformed_aabb()
 		min_point = min_point.min(bounds.position)
 		max_point = max_point.max(bounds.end)
 		for surface in range(mesh_node.mesh.get_surface_count()):
