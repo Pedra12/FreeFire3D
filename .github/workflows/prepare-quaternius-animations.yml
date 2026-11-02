@@ -28,6 +28,13 @@ jobs:
           git add SourceArchives/quaternius-universal-animation-library-standard.zip Assets/Game/Animations/Quaternius/
           if ! git diff --cached --quiet; then
             git commit -m "Add canonical CC0 humanoid animation library"
-            git pull --rebase origin unity-project
-            git push origin HEAD:unity-project
+            for attempt in 1 2 3; do
+              git fetch origin unity-project
+              git rebase origin/unity-project
+              if git push origin HEAD:unity-project; then
+                exit 0
+              fi
+              sleep $((attempt * 2))
+            done
+            exit 1
           fi
