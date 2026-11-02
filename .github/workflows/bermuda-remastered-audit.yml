@@ -89,6 +89,7 @@ jobs:
               scene.render.resolution_x=1600; scene.render.resolution_y=1200; scene.render.resolution_percentage=100
               scene.render.image_settings.file_format='PNG'; scene.render.filepath=os.path.abspath('audit/bermuda-remastered-preview.png')
               scene.render.film_transparent=False
+              if scene.world is None: scene.world=bpy.data.worlds.new('BermudaAuditWorld')
               scene.world.color=(0.18,0.18,0.18)
               bpy.ops.render.render(write_still=True)
               report['preview']='audit/bermuda-remastered-preview.png'
