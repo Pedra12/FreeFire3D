@@ -16,14 +16,13 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Install Blender and image tools
+      - name: Install Blender
         run: |
           sudo apt-get update
           sudo apt-get install -y blender
-          python3 -m pip install --user pillow
       - name: Extract map sources
         run: |
-          mkdir -p /tmp/map-preview audit
+          mkdir -p /tmp/map-preview audit/previews audit/logs
           python3 - <<'PY'
           import zipfile,io,pathlib,re
           root=pathlib.Path('/tmp/map-preview')
@@ -32,44 +31,28 @@ jobs:
               with zipfile.ZipFile(io.BytesIO(raw)) as z:
                 for i in z.infolist():
                   if i.is_dir(): continue
-                  n=pathlib.PurePosixPath(i.filename).name
-                  e=pathlib.Path(n).suffix.lower()
+                  e=pathlib.Path(i.filename).suffix.lower()
                   b=z.read(i)
-                  if e=='.zip' and depth<5: walk(label+'_'+n,b,depth+1)
+                  if e=='.zip' and depth<5: walk(label+'_'+pathlib.Path(i.filename).name,b,depth+1)
                   elif e in ('.blend','.usdz','.usdc','.obj','.mtl','.png','.jpg','.jpeg'):
                     q=root/(re.sub(r'[^A-Za-z0-9_.-]+','_',label+'_'+i.filename))
                     q.parent.mkdir(parents=True,exist_ok=True); q.write_bytes(b)
             except Exception as ex: print('archive issue',label,str(ex)[:200])
           for p in pathlib.Path('.').iterdir():
             if p.suffix.lower() in ('.zip','.usdz'): walk(p.stem,p.read_bytes())
+          print('Extracted sources:')
+          for p in root.rglob('*'):
+            if p.is_file() and p.suffix.lower() in ('.blend','.usdz','.obj'): print(p,p.stat().st_size)
           PY
-      - name: Render Blender previews and material links
+      - name: Inspect and render Blender scenes
         shell: bash
         run: |
           cat > /tmp/preview.py <<'PY'
-          import bpy, json, os, math
+          import bpy, json, os, traceback
           from mathutils import Vector
           from pathlib import Path
           scene=bpy.context.scene
-          scene.render.engine='BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items.keys() else 'BLENDER_EEVEE'
-          scene.render.resolution_x=960; scene.render.resolution_y=720; scene.render.resolution_percentage=70
-          scene.render.image_settings.file_format='PNG'
-          scene.render.film_transparent=False
-          scene.world.color=(0.12,0.12,0.12)
           meshes=[o for o in scene.objects if o.type=='MESH']
-          if not meshes: raise Exception('No mesh objects')
-          pts=[o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
-          lo=Vector((min(p.x for p in pts),min(p.y for p in pts),min(p.z for p in pts)))
-          hi=Vector((max(p.x for p in pts),max(p.y for p in pts),max(p.z for p in pts)))
-          center=(lo+hi)*0.5; span=max((hi-lo).length,1)
-          # use an elevated three-quarter camera; Blender Z is up
-          cam_data=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',cam_data); scene.collection.objects.link(cam)
-          direction=Vector((1.4,-1.8,1.35)).normalized()
-          cam.location=center+direction*span*1.65
-          cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler()
-          cam_data.lens=50; scene.camera=cam
-          ld=bpy.data.lights.new('AuditKey','AREA'); lo_obj=bpy.data.objects.new('AuditKey',ld); scene.collection.objects.link(lo_obj)
-          lo_obj.location=center+Vector((0,-span,span*1.3)); ld.energy=max(span*span*8,1500); ld.size=span*0.7
           mats=[]
           for m in bpy.data.materials:
             refs=[]
@@ -78,43 +61,70 @@ jobs:
                 if n.type=='TEX_IMAGE' and n.image:
                   refs.append({'image':n.image.name,'filepath':n.image.filepath,'packed':bool(n.image.packed_file),'size':list(n.image.size)})
             mats.append({'name':m.name,'images':refs})
-          os.makedirs('audit/previews',exist_ok=True)
-          name=Path(bpy.data.filepath).stem
-          scene.render.filepath=os.path.abspath('audit/previews/'+name+'.png')
-          bpy.ops.render.render(write_still=True)
           objects=[]
+          pts=[]
           for o in meshes:
-            corners=[o.matrix_world @ Vector(c) for c in o.bound_box]
+            corners=[o.matrix_world @ Vector(c) for c in o.bound_box]; pts.extend(corners)
             objects.append({'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),
-             'bounds':{a:[min(getattr(v,a) for v in corners),max(getattr(v,a) for v in corners)] for a in 'xyz'},
-             'materials':[m.name if m else None for m in o.data.materials]})
-          result={'file':bpy.data.filepath,'bounds':{a:[getattr(lo,a),getattr(hi,a)] for a in 'xyz'},
-            'objects':objects,'materials':mats,'preview':scene.render.filepath}
-          Path('audit/'+name+'.json').write_text(json.dumps(result,indent=2),encoding='utf8')
+              'materials':[m.name if m else None for m in o.data.materials],
+              'bounds':{a:[min(getattr(v,a) for v in corners),max(getattr(v,a) for v in corners)] for a in 'xyz'}})
+          result={'file':bpy.data.filepath,'mesh_objects':len(meshes),'objects':objects,'materials':mats}
+          if pts:
+            result['scene_bounds']={a:[min(getattr(p,a) for p in pts),max(getattr(p,a) for p in pts)] for a in 'xyz'}
+          try:
+            if meshes:
+              center=sum(pts,Vector())/len(pts); span=max((Vector(result['scene_bounds']['x']+[0,0])).length,1)
+              lo=Vector([result['scene_bounds'][a][0] for a in 'xyz'])
+              hi=Vector([result['scene_bounds'][a][1] for a in 'xyz'])
+              span=max((hi-lo).length,1)
+              camd=bpy.data.cameras.new('AuditCamera'); cam=bpy.data.objects.new('AuditCamera',camd); scene.collection.objects.link(cam)
+              cam.location=center+Vector((1.4,-1.8,1.35)).normalized()*span*1.8
+              cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler()
+              camd.lens=50; scene.camera=cam
+              ld=bpy.data.lights.new('AuditKey','AREA'); lamp=bpy.data.objects.new('AuditKey',ld); scene.collection.objects.link(lamp)
+              lamp.location=center+Vector((0,-span,span*1.3)); ld.energy=max(span*span*8,1500); ld.size=span*.7
+              scene.render.engine='BLENDER_WORKBENCH'
+              scene.display.shading.light='STUDIO'; scene.display.shading.color_type='MATERIAL'
+              scene.render.resolution_x=960; scene.render.resolution_y=720; scene.render.resolution_percentage=60
+              scene.render.image_settings.file_format='PNG'
+              name=Path(bpy.data.filepath).stem
+              scene.render.filepath=os.path.abspath('audit/previews/'+name+'.png')
+              bpy.ops.render.render(write_still=True)
+              result['preview']=scene.render.filepath
+          except Exception as e:
+            result['preview_error']=str(e); result['traceback']=traceback.format_exc()[-3000:]
+          Path('audit/'+Path(bpy.data.filepath).stem+'.json').write_text(json.dumps(result,indent=2),encoding='utf8')
           PY
           find /tmp/map-preview -type f -name '*.blend' -print0 | while IFS= read -r -d '' f; do
-            blender -b "$f" --python /tmp/preview.py || echo "BLENDER_PREVIEW_FAILED:$f"
+            echo "INSPECTING $f"
+            blender -b "$f" --python /tmp/preview.py > "audit/logs/$(basename "$f").log" 2>&1 || echo "BLENDER_FAILED:$f" | tee -a audit/logs/failures.txt
           done
-          python3 - <<'PY'
-          import bpy, json, os, pathlib
+      - name: Inspect USDZ scene
+        shell: bash
+        run: |
+          cat > /tmp/usd.py <<'PY'
+          import bpy,json,pathlib,traceback
           from mathutils import Vector
-          src=next(pathlib.Path('/tmp/map-preview').glob('*.usdz'),None)
-          if src:
-            try:
-              bpy.ops.wm.usd_import(filepath=str(src))
+          p=next(pathlib.Path('/tmp/map-preview').glob('*.usdz'),None)
+          out={'source':str(p) if p else None}
+          try:
+            if p:
+              bpy.ops.wm.usd_import(filepath=str(p))
               objs=[o for o in bpy.context.scene.objects if o.type=='MESH']
               pts=[o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
-              data={'file':str(src),'mesh_objects':len(objs),'objects':[{'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'materials':[m.name if m else None for m in o.data.materials]} for o in objs]}
-              if pts:
-                data['bounds']={a:[min(getattr(p,a) for p in pts),max(getattr(p,a) for p in pts)] for a in 'xyz'}
-              pathlib.Path('audit/usdz-import.json').write_text(json.dumps(data,indent=2),encoding='utf8')
-            except Exception as e:
-              pathlib.Path('audit/usdz-import-error.txt').write_text(str(e),encoding='utf8')
+              out['mesh_objects']=len(objs)
+              out['objects']=[{'name':o.name,'vertices':len(o.data.vertices),'faces':len(o.data.polygons),'materials':[m.name if m else None for m in o.data.materials]} for o in objs]
+              if pts: out['bounds']={a:[min(getattr(v,a) for v in pts),max(getattr(v,a) for v in pts)] for a in 'xyz'}
+            else: out['error']='No USDZ found'
+          except Exception as e: out['error']=str(e); out['traceback']=traceback.format_exc()[-3000:]
+          pathlib.Path('audit/usdz-import.json').write_text(json.dumps(out,indent=2),encoding='utf8')
           PY
+          blender -b --python /tmp/usd.py > audit/logs/usdz.log 2>&1 || true
       - name: Upload visual and material audit
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: freefire3d-map-visual-audit
           path: audit/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
