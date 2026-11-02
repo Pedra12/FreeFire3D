@@ -2,12 +2,13 @@
   "source": "Quaternius Universal Animation Library [Standard]",
   "source_url": "https://quaternius.itch.io/universal-animation-library",
   "license": "CC0 1.0 Universal",
-  "selected_variant": "Unreal-Godot/UAL1_Standard.glb",
+  "selected_variant": "Unity/UAL1_Standard.fbx",
+  "reference_manifest_variant": "Unreal-Godot/UAL1_Standard.glb",
   "root_motion": false,
   "archive_sha256": "cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724",
   "archive_size_bytes": 15904933,
-  "glb_sha256": "69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997",
-  "glb_size_bytes": 7618436,
+  "fbx_sha256": "21b32d912da3cb93426d974fb945e86f5b2e86970acd2ce89905e0fbf9f1dcc2",
+  "fbx_size_bytes": 23754684,
   "animation_count": 43,
   "animation_names": [
     "A_TPose",
@@ -54,10 +55,10 @@
     "Walk_Formal_Loop",
     "Walk_Loop"
   ],
-  "skin_count": 1,
-  "node_count": 67,
-  "joint_count": 65,
-  "joint_names": [
+  "reference_skin_count": 1,
+  "reference_node_count": 67,
+  "reference_joint_count": 65,
+  "reference_joint_names": [
     "Head",
     "ball_l",
     "ball_leaf_l",
