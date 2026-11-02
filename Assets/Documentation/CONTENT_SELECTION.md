@@ -6,20 +6,20 @@ This branch is a standalone Unity project. Godot scenes, scripts, imported resou
 
 | Slot | One approved asset | Source archive in repository | Import destination |
 |---|---|---|---|
-| Player character | Olivia, rigged humanoid | `SourceArchives/olivia-free-fire.zip` | `Assets/Game/Characters/Olivia/` |
-| Match map | Clocktower | `SourceArchives/free-fire-clocktower-3d-model-by-rs-ratul.zip` | `Assets/Game/Maps/Clocktower/` |
+| Player character | Olivia, one rigged humanoid | `SourceArchives/olivia-free-fire.zip` | `Assets/Game/Characters/Olivia/` |
+| Match map | Clocktower, one environment | `SourceArchives/free-fire-clocktower-3d-model-by-rs-ratul.zip` | `Assets/Game/Maps/Clocktower/` |
+| Humanoid animation source | Quaternius Universal Animation Library Standard, in-place FBX | `SourceArchives/quaternius-universal-animation-library-standard.zip` | `Assets/Game/Animations/Quaternius/` |
 
-These are the only selected character and map for the first playable vertical slice. Do not import the other character bundles or map archives as alternate versions.
+Olivia is the only playable character and Clocktower is the only selected map for the first vertical slice. The Quaternius FBX is an animation-donor rig only: its mesh is disabled during Unity import and must never be instantiated as a second player character.
 
 ## Import gate
 
-The two selected source archives are stored in `SourceArchives/`, outside the Unity `Assets/` folder. They must be inspected before extraction. Confirm:
-- exact model file and texture dependencies;
-- skeleton hierarchy, mesh weights and animation clips for Olivia;
-- map coordinate orientation, scale, material references and collision suitability;
-- asset license and attribution requirements.
+Only the selected source exports are extracted from the archives:
+- Olivia: one GLB, with generated skeleton and skin weights.
+- Clocktower: one FBX source converted to one self-contained GLB.
+- Quaternius: one Unity FBX with root motion disabled, imported as a Humanoid animation source.
 
-After inspection, extract only the approved files into the destinations above. Do not copy the entire archive if it contains duplicate exports, previews, alternate LODs with unclear naming, or unrelated assets.
+Keep the archives in `SourceArchives/`, outside runtime content. Do not import alternate exports, root-motion variants, duplicate map versions or extra playable characters.
 
 ## Replacement policy
 
@@ -27,12 +27,12 @@ If an approved asset is replaced, remove the old asset from its canonical destin
 
 ## Separation policy
 
-- This branch's working tree: Unity project only, plus the two approved source archives and CI workflow.
+- This branch's working tree: Unity project only, plus the three approved source archives and CI workflows.
 - Legacy Godot project: preserved on branch `4v4-premium-prototype`.
-- `SourceArchives/`: the two original source archives, not runtime content.
+- `SourceArchives/`: original source archives, not runtime content.
 - Never reference a `res://` Godot path from Unity.
 - Never place Godot scenes, scripts, `.import` files or `.godot` cache in this branch.
 
 ## Current status
 
-The selected source archives have been identified by filename and repository blob metadata. Their binary contents have not yet been extracted or inspected in this environment, so no character or map has been imported into Unity yet. Do not mark the asset-import milestone complete until the checks above pass.
+Olivia and Clocktower source assets have been inspected and converted into their single canonical runtime files. The Quaternius Standard archive passed checksum and ZIP-integrity checks; its in-place FBX is selected as the only animation source. Unity Editor import and runtime validation remain pending.
