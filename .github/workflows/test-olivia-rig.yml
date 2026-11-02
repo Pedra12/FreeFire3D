@@ -1,0 +1,28 @@
+name: Test humanoid rig for canonical Olivia
+
+on:
+  push:
+    branches:
+      - unity-project
+    paths:
+      - "Tools/test_rig_olivia.py"
+      - ".github/workflows/test-olivia-rig.yml"
+      - "SourceArchives/olivia-free-fire.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rig-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated Unity project
+        uses: actions/checkout@v4
+      - name: Install Blender and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy
+      - name: Generate and round-trip test humanoid rig
+        run: blender --background --python Tools/test_rig_olivia.py -- "$GITHUB_WORKSPACE"
