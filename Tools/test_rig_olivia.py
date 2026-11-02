@@ -353,6 +353,20 @@ _, exported_json, _ = read_glb_json(out_glb)
 exported_images = len(exported_json.get("images", []))
 exported_meshes = len(exported_json.get("meshes", []))
 exported_skins = len(exported_json.get("skins", []))
+mesh_nodes_info = [
+    {
+        "name": node.get("name", ""),
+        "mesh": node.get("mesh"),
+        "skin": node.get("skin"),
+        "primitives": len(exported_json.get("meshes", [])[node["mesh"]].get("primitives", []))
+            if "mesh" in node else 0
+    }
+    for node in exported_json.get("nodes", []) if "mesh" in node
+]
+print("OLIVIA_GLB_MESH_NODES=" + json.dumps(mesh_nodes_info), flush=True)
+unskinned_nodes = [node["name"] or f"mesh_{node['mesh']}" for node in mesh_nodes_info if node["skin"] is None]
+if unskinned_nodes:
+    raise SystemExit("GLB contains mesh nodes without the humanoid skin: " + ", ".join(unskinned_nodes))
 if exported_meshes != source_mesh_count:
     raise SystemExit(f"GLB mesh count mismatch: {exported_meshes} != {source_mesh_count}")
 if exported_skins != 1:
