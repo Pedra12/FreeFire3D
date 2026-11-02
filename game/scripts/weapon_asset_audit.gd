@@ -19,6 +19,13 @@ func _audit() -> void:
 	await process_frame
 	await process_frame
 	var model := player.get_node("VisualRoot/FemalePlayer")
+	var anim_nodes := model.find_children("*", "AnimationPlayer", true, false)
+	for anim_node in anim_nodes:
+		var anim_player := anim_node as AnimationPlayer
+		for animation_name in anim_player.get_animation_list():
+			var lower_name := animation_name.to_lower()
+			if "shoot" in lower_name or "fire" in lower_name or "reload" in lower_name or "rifle" in lower_name or "aim" in lower_name:
+				print("COMBAT_ANIMATION=", animation_name)
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	print("PLAYER_SKELETON_COUNT=", skeletons.size())
 	for skeleton in skeletons:
@@ -40,6 +47,6 @@ func _audit() -> void:
 	print("WEAPON_MESH_COUNT=", meshes.size())
 	for mesh_node in meshes:
 		var mesh := mesh_node as MeshInstance3D
-		print("WEAPON_MESH_AABB=", mesh.name, " ", mesh.get_aabb())
+		print("WEAPON_MESH_AABB=", mesh.name, " ", mesh.get_aabb(), " transformed=", mesh.get_transformed_aabb())
 	print("WEAPON_AUDIT_OK")
 	quit(0)
