@@ -9,7 +9,7 @@ extends CharacterBody3D
 @export var team_id: int = 0
 
 @onready var visual: Node3D = $VisualRoot
-@onready var model: Node3D = $VisualRoot/FemalePlayer
+@onready var model: Node3D = $VisualRoot/Olivia
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/Camera3D
 @onready var hud: Control = get_node("../MobileHUD") as Control
