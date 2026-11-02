@@ -195,7 +195,7 @@ jobs:
       - name: Export Android APK
         run: |
           mkdir -p build
-          "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-Bermuda-Survival.apk" 2>&1 | tee build/android-export.log
+          "$GODOT_BIN" --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/FreeFire3D-RiverSide-Survival.apk" 2>&1 | tee build/android-export.log
           test -s build/FreeFire3D-Bermuda-Survival.apk
           unzip -t build/FreeFire3D-Bermuda-Survival.apk
           AAPT_BIN="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
@@ -208,7 +208,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: FreeFire3D-Bermuda-Survival-APK
+          name: FreeFire3D-RiverSide-Survival-APK
           path: build/
           if-no-files-found: warn
           retention-days: 14
