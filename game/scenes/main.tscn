@@ -41,7 +41,6 @@ size = Vector3(130, 1, 130)
 environment = SubResource("Environment_main")
 
 [node name="Map" parent="." instance=ExtResource("1_map")]
-scale = Vector3(0.01, 0.01, 0.01)
 script = ExtResource("2_collisions")
 
 [node name="SafeGround" type="StaticBody3D" parent="."]
