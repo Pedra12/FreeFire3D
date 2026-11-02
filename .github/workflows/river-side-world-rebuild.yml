@@ -16,21 +16,26 @@ permissions:
 jobs:
   convert-and-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout rebuild branch
         uses: actions/checkout@v4
-      - name: Install Blender and archive tools
+      - name: Install archive tools and download official Blender with USD support
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender unzip python3
-          blender --version
-      - name: Extract River Side USDZ and inspect contents
+          sudo apt-get install -y xz-utils unzip curl
+          curl -L --fail --retry 3 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          mkdir -p /opt/blender
+          tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+          /opt/blender/blender --version
+          /opt/blender/blender -b --python-expr "import bpy; print('USD_IMPORT_OPERATOR', hasattr(bpy.ops.wm, 'usd_import'))"
+      - name: Extract River Side USDZ and preserve texture paths
         run: |
           mkdir -p build/river_side/source build/river_side/converted
           python3 - <<'PY'
           import zipfile, pathlib, json
           archive=pathlib.Path("River_Side_3D_Model_Free_Fire.usdz")
+          root=pathlib.Path("build/river_side/source")
           with zipfile.ZipFile(archive) as z:
               entries=z.namelist()
               usdc=[n for n in entries if n.lower().endswith(".usdc")]
@@ -39,21 +44,25 @@ jobs:
                   raise SystemExit(f"Expected one USD crate, found {usdc}")
               for name in entries:
                   if name.endswith("/"): continue
-                  target=pathlib.Path("build/river_side/source")/pathlib.Path(name).name
+                  target=root/name
+                  target.parent.mkdir(parents=True,exist_ok=True)
                   target.write_bytes(z.read(name))
-          report={"archive":str(archive),"usd_scene":pathlib.Path(usdc[0]).name,
-                  "texture_count":len(textures),"archive_entries":len(entries)}
+          report={"archive":str(archive),"usd_scene":usdc[0],
+                  "texture_count":len(textures),"archive_entries":len(entries),
+                  "texture_paths":textures}
           pathlib.Path("build/river_side/source-report.json").write_text(json.dumps(report,indent=2))
           print(json.dumps(report,indent=2))
           PY
       - name: Convert USD scene to glTF binary with Blender
         run: |
-          USD_FILE="$(find build/river_side/source -maxdepth 1 -iname '*.usdc' -o -iname '*.usd' | head -n 1)"
+          USD_FILE="$(find build/river_side/source -maxdepth 2 -name '*.usdc' | head -n 1)"
           test -n "$USD_FILE"
           cat > build/river_side/convert_usd.py <<'PY'
           import bpy, os, json
           source=os.environ["USD_FILE"]
           output=os.environ["GLB_FILE"]
+          if not hasattr(bpy.ops.wm, "usd_import"):
+              raise RuntimeError("Official Blender build lacks USD import support")
           bpy.ops.object.select_all(action="SELECT")
           bpy.ops.object.delete(use_global=False)
           bpy.ops.wm.usd_import(filepath=source, import_textures_mode="IMPORT")
@@ -77,7 +86,7 @@ jobs:
           PY
           export USD_FILE
           export GLB_FILE="$PWD/build/river_side/converted/river_side.glb"
-          blender -b -t 2 --python build/river_side/convert_usd.py 2>&1 | tee build/river_side/blender-conversion.log
+          /opt/blender/blender -b -t 2 --python build/river_side/convert_usd.py 2>&1 | tee build/river_side/blender-conversion.log
           test -s build/river_side/converted/river_side.glb
           grep RIVER_SIDE_GLB_CONVERTED build/river_side/blender-conversion.log
       - name: Upload conversion and geometry audit
