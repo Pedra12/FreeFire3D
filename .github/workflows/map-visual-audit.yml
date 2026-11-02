@@ -1,6 +1,10 @@
 name: Map visual and material audit
 
 on:
+  push:
+    paths:
+      - ".github/workflows/map-visual-audit.yml"
+      - "docs/map-visual-audit-trigger.md"
   workflow_dispatch:
 
 permissions:
