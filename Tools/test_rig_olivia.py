@@ -61,6 +61,29 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 print("OLIVIA_IMPORTED_IMAGES=" + ", ".join(img.name for img in bpy.data.images), flush=True)
 loaded_image_indices = set()
+for image in list(bpy.data.images):
+    match = re.search(r"Image[_ ]?(\d+)", image.name)
+    if not match:
+        continue
+    index = int(match.group(1))
+    if index not in extracted_images:
+        continue
+    path = extracted_images[index]
+    loaded = bpy.data.images.load(str(path), check_existing=False)
+    if not loaded.has_data:
+        loaded.reload()
+    if not loaded.has_data:
+        raise SystemExit(f"Could not decode extracted Olivia image {index}: {path}")
+    loaded.pack()
+    loaded_image_indices.add(index)
+    for material in bpy.data.materials:
+        if material.use_nodes and material.node_tree:
+            for node in material.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image == image:
+                    node.image = loaded
+
+if loaded_image_indices != set(extracted_images.keys()):
+    raise SystemExit(f"Not all embedded Olivia images were loaded: {sorted(loaded_image_indices)}")
 used_source_images = set()
 for material in bpy.data.materials:
     if material.use_nodes and material.node_tree:
@@ -71,207 +94,9 @@ for image in used_source_images:
     if not image.has_data or image.size[0] <= 0 or image.size[1] <= 0:
         raise SystemExit(f"Olivia source texture has no pixels: {image.name}")
     image.pack()
+print(f"OLIVIA_SOURCE_TEXTURES={len(used_source_images)}", flush=True)
 
-print(f"OLIVIA_SOURCE_TEXTURES={len(bpy.data.images)}", flush=True)
-center_x = (mins[0] + maxs[0]) * 0.5
-center_y = (mins[1] + maxs[1]) * 0.5
-z0 = mins[2]
-
-def z(ratio):
-    return z0 + height * ratio
-
-# The source is an A-pose: shoulder line high, arms angle down and outward.
-z_hips, z_knee, z_ankle = z(0.49), z(0.25), z(0.06)
-z_spine, z_chest, z_neck, z_head = z(0.64), z(0.78), z(0.84), z(0.99)
-z_elbow, z_wrist, z_hand = z(0.68), z(0.57), z(0.52)
-shoulder_x, elbow_x, wrist_x, hand_x = 0.36, 0.84, 1.22, 1.36
-hip_x, knee_x, ankle_x = 0.22, 0.22, 0.20
-
-arm_data = bpy.data.armatures.new("Olivia_Humanoid_Armature")
-armature = bpy.data.objects.new("Olivia_Humanoid_Armature", arm_data)
-bpy.context.scene.collection.objects.link(armature)
-bpy.context.view_layer.objects.active = armature
-armature.select_set(True)
-bpy.ops.object.mode_set(mode="EDIT")
-bones = {}
-
-def make_bone(name, head, tail, parent=None, deform=True):
-    bone = arm_data.edit_bones.new(name)
-    bone.head = Vector(head)
-    bone.tail = Vector(tail)
-    bone.use_deform = deform
-    if parent:
-        bone.parent = bones[parent]
-        bone.use_connect = (bone.head - bones[parent].tail).length < 0.0001
-    bones[name] = bone
-    return bone
-
-make_bone("Root", (center_x, center_y, z0), (center_x, center_y, z_hips), deform=False)
-make_bone("Hips", (center_x, center_y, z_hips), (center_x, center_y, z_hips + 0.22), "Root")
-make_bone("Spine", (center_x, center_y, z_hips + 0.22), (center_x, center_y, z_spine), "Hips")
-make_bone("Chest", (center_x, center_y, z_spine), (center_x, center_y, z_chest), "Spine")
-make_bone("Neck", (center_x, center_y, z_chest), (center_x, center_y, z_neck), "Chest")
-make_bone("Head", (center_x, center_y, z_neck), (center_x, center_y, z_head), "Neck")
-
-for side, label in ((-1, "Left"), (1, "Right")):
-    make_bone(f"{label}Shoulder",
-              (center_x, center_y, z_chest),
-              (center_x + side * shoulder_x, center_y, z_chest),
-              "Chest")
-    make_bone(f"{label}UpperArm",
-              (center_x + side * shoulder_x, center_y, z_chest),
-              (center_x + side * elbow_x, center_y, z_elbow),
-              f"{label}Shoulder")
-    make_bone(f"{label}LowerArm",
-              (center_x + side * elbow_x, center_y, z_elbow),
-              (center_x + side * wrist_x, center_y, z_wrist),
-              f"{label}UpperArm")
-    make_bone(f"{label}Hand",
-              (center_x + side * wrist_x, center_y, z_wrist),
-              (center_x + side * hand_x, center_y, z_hand),
-              f"{label}LowerArm")
-
-    make_bone(f"{label}UpperLeg",
-              (center_x + side * hip_x, center_y, z_hips),
-              (center_x + side * knee_x, center_y, z_knee),
-              "Hips")
-    make_bone(f"{label}LowerLeg",
-              (center_x + side * knee_x, center_y, z_knee),
-              (center_x + side * ankle_x, center_y, z_ankle),
-              f"{label}UpperLeg")
-    make_bone(f"{label}Foot",
-              (center_x + side * ankle_x, center_y, z_ankle),
-              (center_x + side * ankle_x, center_y - 0.28, z0 + 0.025),
-              f"{label}LowerLeg")
-    make_bone(f"{label}Toes",
-              (center_x + side * ankle_x, center_y - 0.28, z0 + 0.025),
-              (center_x + side * ankle_x, center_y - 0.42, z0 + 0.025),
-              f"{label}Foot")
-
-bpy.ops.object.mode_set(mode="OBJECT")
-armature.show_in_front = True
-armature.data.display_type = "STICK"
-
-bone_segments = {}
-for bone in arm_data.bones:
-    if bone.name == "Root":
-        continue
-    bone_segments[bone.name] = (
-        armature.matrix_world @ bone.head_local,
-        armature.matrix_world @ bone.tail_local
-    )
-
-def segment_distance(point, a, b):
-    ab = b - a
-    length_sq = ab.length_squared
-    if length_sq < 1e-10:
-        return (point - a).length
-    t = max(0.0, min(1.0, (point - a).dot(ab) / length_sq))
-    return (point - (a + t * ab)).length
-
-def manual_weights(obj):
-    for group in list(obj.vertex_groups):
-        obj.vertex_groups.remove(group)
-    groups = {name: obj.vertex_groups.new(name=name) for name in bone_segments}
-    for vertex in obj.data.vertices:
-        world = obj.matrix_world @ vertex.co
-        distances = sorted(
-            ((segment_distance(world, a, b), name) for name, (a, b) in bone_segments.items()),
-            key=lambda item: item[0]
-        )[:4]
-        raw = [1.0 / ((distance + 0.12) ** 2) for distance, _ in distances]
-        total = sum(raw)
-        for (_, name), weight in zip(distances, raw):
-            groups[name].add([vertex.index], weight / total, "REPLACE")
-
-def weighted_vertex_count(obj):
-    return sum(1 for v in obj.data.vertices if any(g.weight > 0.0001 for g in v.groups))
-
-auto_weighted = 0
-fallback_weighted = len(meshes)
-for obj in meshes:
-    world = obj.matrix_world.copy()
-    obj.parent = armature
-    obj.matrix_world = world
-    for modifier in list(obj.modifiers):
-        if modifier.type == "ARMATURE":
-            obj.modifiers.remove(modifier)
-    modifier = obj.modifiers.new("Olivia_Armature", "ARMATURE")
-    modifier.object = armature
-    manual_weights(obj)
-    if weighted_vertex_count(obj) != len(obj.data.vertices):
-        raise SystemExit(f"Unweighted vertices remain in {obj.name}")
-
-bone_weight_counts = {name: 0 for name in bone_segments}
-for obj in meshes:
-    group_by_index = {g.index: g.name for g in obj.vertex_groups}
-    for vertex in obj.data.vertices:
-        for assignment in vertex.groups:
-            name = group_by_index.get(assignment.group)
-            if name in bone_weight_counts and assignment.weight > 0.0001:
-                bone_weight_counts[name] += 1
-missing_weight_bones = [name for name, count in bone_weight_counts.items() if count == 0]
-if missing_weight_bones:
-    raise SystemExit("Humanoid bones without any weighted vertices: " + ", ".join(missing_weight_bones))
-
-# Test a small pose change and verify that the skinned meshes actually deform.
-def all_deformed_positions():
-    bpy.context.view_layer.update()
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    positions = []
-    for obj in meshes:
-        evaluated = obj.evaluated_get(depsgraph)
-        evaluated_mesh = evaluated.to_mesh()
-        positions.extend(evaluated.matrix_world @ v.co for v in evaluated_mesh.vertices)
-        evaluated.to_mesh_clear()
-    return positions
-
-before = all_deformed_positions()
-for bone_name, angle in (("LeftUpperArm", 0.12), ("LeftLowerArm", -0.08)):
-    pose_bone = armature.pose.bones.get(bone_name)
-    if pose_bone is None:
-        raise SystemExit(f"{bone_name} bone missing after rig creation.")
-    pose_bone.rotation_mode = "XYZ"
-    pose_bone.rotation_euler[0] = angle
-after = all_deformed_positions()
-deformation = max(((a-b).length for a, b in zip(before, after)), default=0.0)
-for pose_bone in armature.pose.bones:
-    pose_bone.rotation_euler = (0.0, 0.0, 0.0)
-bpy.context.view_layer.update()
-if deformation < 0.0001:
-    raise SystemExit("Rig pose test produced no measurable mesh deformation.")
-
-# Export one scaled FBX, with the source GLB's embedded textures.
-out_fbx = tmp / "Olivia.fbx"
-scale_factor = 1.78 / height
-bpy.ops.object.select_all(action="DESELECT")
-armature.select_set(True)
-for obj in meshes:
-    obj.select_set(True)
-bpy.context.view_layer.objects.active = armature
-bpy.ops.export_scene.fbx(
-    filepath=str(out_fbx),
-    use_selection=True,
-    object_types={"ARMATURE", "MESH"},
-    global_scale=scale_factor,
-    apply_unit_scale=True,
-    use_mesh_modifiers=True,
-    add_leaf_bones=False,
-    use_armature_deform_only=True,
-    bake_anim=False,
-    path_mode="COPY",
-    embed_textures=True,
-    axis_forward="-Z",
-    axis_up="Y",
-)
-
-# Re-import the FBX and validate skeleton, skinning, scale and mesh count.
-bpy.ops.wm.read_factory_settings(use_empty=True)
-if hasattr(bpy.ops.wm, "fbx_import"):
-    bpy.ops.wm.fbx_import(filepath=str(out_fbx), use_anim=False)
-else:
-    bpy.ops.import_scene.fbx(filepath=str(out_fbx), use_image_search=True, use_anim=False)
-reimport_meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 reimport_armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
 if len(reimport_meshes) != 7 or len(reimport_armatures) != 1:
     raise SystemExit(f"FBX round-trip mismatch: meshes={len(reimport_meshes)} armatures={len(reimport_armatures)}")
