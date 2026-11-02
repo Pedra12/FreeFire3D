@@ -96,6 +96,7 @@ jobs:
               result.append(item)
           Path('usd-scene-audit.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
           print('USD_SCENES',len(result),'OPENED',sum(x.get('status')=='ok' for x in result))
+          print(json.dumps(result,indent=2))
           PY
       - name: Inspect model files with Blender
         shell: bash
@@ -189,5 +190,6 @@ jobs:
           path: |
             /tmp/ff_asset_deep_audit.json
             deep-3d-asset-audit-summary.md
+            usd-scene-audit.json
           if-no-files-found: error
           retention-days: 14
