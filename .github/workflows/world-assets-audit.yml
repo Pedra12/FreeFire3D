@@ -87,23 +87,27 @@ jobs:
                       if obj is not None:
                           bpy.context.scene.collection.objects.link(obj)
               elif ext==".obj":
-                  # Repair broken MTL texture paths in redistributed Free Fire OBJ archives.
-                  # The Circuit MTL points to a creator's old absolute paths and bare filenames,
-                  # while the actual PNGs are stored in the sibling Texture directory.
-                  mtl_path=path.with_suffix(".mtl")
-                  if mtl_path.exists():
-                      repaired=[]
-                      texture_dir=path.parent.parent/"Texture"
-                      for line in mtl_path.read_text(encoding="utf-8",errors="replace").splitlines():
-                          stripped=line.strip()
-                          if stripped.lower().startswith("map_kd "):
-                              source=Path(stripped.split(maxsplit=1)[1].strip().strip('"'))
-                              candidates=[path.parent/source, texture_dir/source.name, path.parent/"Texture"/source.name]
-                              found=next((candidate for candidate in candidates if candidate.is_file()),None)
-                              if found is not None:
-                                  line="map_Kd "+os.path.relpath(found,path.parent).replace(os.sep,"/")
-                          repaired.append(line)
-                      mtl_path.write_text("\\n".join(repaired)+"\\n",encoding="utf-8")
+                  # OBJ references 170.mtl while the archive renamed it The Circuit.mtl.
+                  # Recreate the referenced MTL and repair its stale texture paths.
+                  obj_lines=path.read_text(encoding="utf-8",errors="replace").splitlines()
+                  mtl_refs=[line.split(maxsplit=1)[1].strip() for line in obj_lines if line.strip().lower().startswith("mtllib ")]
+                  source_mtl=path.with_suffix(".mtl")
+                  for mtl_ref in mtl_refs:
+                      target_mtl=path.parent/mtl_ref
+                      if not target_mtl.exists() and source_mtl.exists():
+                          lines=source_mtl.read_text(encoding="utf-8",errors="replace").splitlines()
+                          repaired=[]
+                          texture_dir=path.parent.parent/"Texture"
+                          for line in lines:
+                              stripped=line.strip()
+                              if stripped.lower().startswith("map_kd "):
+                                  source=Path(stripped.split(maxsplit=1)[1].strip().strip('"'))
+                                  candidates=[path.parent/source, texture_dir/source.name, path.parent/"Texture"/source.name]
+                                  found=next((candidate for candidate in candidates if candidate.is_file()),None)
+                                  if found is not None:
+                                      line="map_Kd "+os.path.relpath(found,path.parent).replace(os.sep,"/")
+                              repaired.append(line)
+                          target_mtl.write_text("\\n".join(repaired)+"\\n",encoding="utf-8")
                   bpy.ops.wm.obj_import(filepath=str(path))
               elif ext==".gltf" or ext==".glb":
                   bpy.ops.import_scene.gltf(filepath=str(path))
