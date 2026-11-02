@@ -57,7 +57,7 @@ jobs:
           for image in bpy.data.images:
             if image.source=='FILE':
               name=Path(image.filepath).name.lower()
-              candidates=image_files.get(name,[])
+              candidates=image_files.get(name,[]) or [p for p in root.rglob('*') if p.is_file() and p.name.lower().endswith('_'+name)]
               if candidates:
                 image.filepath=str(candidates[0]); image.reload()
           scene=bpy.context.scene
@@ -77,7 +77,7 @@ jobs:
             cd=bpy.data.cameras.new('PreviewCamera'); cam=bpy.data.objects.new('PreviewCamera',cd); scene.collection.objects.link(cam)
             cam.location=center+Vector((1.4,-1.8,1.35)).normalized()*span*1.8; cam.rotation_euler=(center-cam.location).to_track_quat('-Z','Y').to_euler(); cd.lens=50; scene.camera=cam
             ld=bpy.data.lights.new('PreviewKey','AREA'); lamp=bpy.data.objects.new('PreviewKey',ld); scene.collection.objects.link(lamp); lamp.location=center+Vector((0,-span,span*1.3)); ld.energy=max(span*span*8,1500); ld.size=span*.7
-            scene.render.engine='BLENDER_EEVEE_NEXT'
+            scene.render.engine='BLENDER_EEVEE'
             scene.render.resolution_x=1280; scene.render.resolution_y=960; scene.render.resolution_percentage=65; scene.render.image_settings.file_format='PNG'
             scene.render.filepath=os.path.abspath('audit/previews/'+Path(bpy.data.filepath).stem+'_textured.png')
             try: bpy.ops.render.render(write_still=True); item['preview']=scene.render.filepath
