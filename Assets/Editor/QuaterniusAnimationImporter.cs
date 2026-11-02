@@ -20,13 +20,26 @@ namespace FreeFire3D.EditorTools
             importer.importAnimation = true;
             importer.animationType = ModelImporterAnimationType.Human;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
-            importer.importMesh = false;
-            importer.importMaterials = false;
+            importer.materialImportMode = ModelImporterMaterialImportMode.None;
             importer.importCameras = false;
             importer.importLights = false;
             importer.optimizeGameObjects = false;
             importer.animationCompression = ModelImporterAnimationCompression.Optimal;
             importer.resampleCurves = true;
+        }
+
+        private void OnPostprocessModel(GameObject root)
+        {
+            if (!string.Equals(assetPath, AnimationPath, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // Keep the donor skeleton and animation curves, but strip its renderers so
+            // the animation pack cannot become a second playable character in the scene.
+            foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+                UnityEngine.Object.DestroyImmediate(renderer);
+
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+                UnityEngine.Object.DestroyImmediate(filter);
         }
 
         private static void OnPostprocessAllAssets(
