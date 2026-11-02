@@ -80,6 +80,15 @@ func _layout() -> void:
 func get_move_vector() -> Vector2:
 	return move_vector
 
+func is_touch_on_control(pos: Vector2) -> bool:
+	return pos.distance_to(jump_center) < button_radius * 1.4 \
+		or pos.distance_to(aim_center) < button_radius * 1.4 \
+		or pos.distance_to(fire_center) < button_radius * 1.5 \
+		or pos.distance_to(reload_center) < button_radius * 1.3 \
+		or pos.distance_to(grenade_center) < button_radius * 1.3 \
+		or pos.distance_to(medkit_center) < button_radius * 1.3 \
+		or pos.distance_to(inventory_center) < button_radius * 1.4
+
 func set_ammo(current: int, reserve: int) -> void:
 	ammo_current = current
 	ammo_reserve = reserve
