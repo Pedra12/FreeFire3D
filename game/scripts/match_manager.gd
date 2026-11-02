@@ -14,7 +14,9 @@ func _ready() -> void:
 func _connect_match() -> void:
 	await get_tree().process_frame
 	player_node = get_tree().get_first_node_in_group("player") as Node3D
-	hud = get_tree().current_scene.get_node_or_null("MobileHUD") as Control
+	hud = player_node.get_node_or_null("../MobileHUD") as Control if is_instance_valid(player_node) else null
+	if hud == null:
+		hud = get_tree().root.find_child("MobileHUD", true, false) as Control
 	if is_instance_valid(player_node):
 		var health := player_node.get_node_or_null("Health")
 		if health != null and health.has_signal("eliminated"):
