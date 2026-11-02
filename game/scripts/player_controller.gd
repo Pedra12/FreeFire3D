@@ -137,6 +137,8 @@ func _physics_process(delta: float) -> void:
 func play_action_animation(animation_name: StringName) -> void:
 	if animation_player == null or not animation_player.has_animation(animation_name):
 		return
+	if action_animation_locked and animation_player.is_playing():
+		return
 	action_animation_locked = true
 	current_animation = animation_name
 	animation_player.play(animation_name, 0.06)
