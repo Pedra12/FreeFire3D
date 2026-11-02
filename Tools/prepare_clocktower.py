@@ -4,12 +4,15 @@ import hashlib
 import io
 import json
 import struct
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
 
-import bpy
+sys.path.append('/usr/lib/python3/dist-packages')
 from PIL import Image
+
+import bpy
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[1]
