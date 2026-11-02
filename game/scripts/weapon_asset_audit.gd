@@ -13,6 +13,7 @@ func _audit() -> void:
 	root.add_child(test_root)
 	var test_hud := Control.new()
 	test_hud.name = "MobileHUD"
+	test_hud.set_script(load("res://scripts/mobile_hud.gd"))
 	test_root.add_child(test_hud)
 	var player := player_scene.instantiate()
 	test_root.add_child(player)
@@ -47,6 +48,6 @@ func _audit() -> void:
 	print("WEAPON_MESH_COUNT=", meshes.size())
 	for mesh_node in meshes:
 		var mesh := mesh_node as MeshInstance3D
-		print("WEAPON_MESH_AABB=", mesh.name, " ", mesh.get_aabb(), " transformed=", mesh.get_transformed_aabb())
+		print("WEAPON_MESH_AABB=", mesh.name, " ", mesh.get_aabb())
 	print("WEAPON_AUDIT_OK")
 	quit(0)
