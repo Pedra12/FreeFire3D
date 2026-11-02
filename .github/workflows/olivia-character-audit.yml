@@ -24,6 +24,7 @@ jobs:
           mkdir -p /opt/blender
           tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
           echo "BLENDER_BIN=/opt/blender/blender" >> "$GITHUB_ENV"
+          export BLENDER_BIN=/opt/blender/blender
           "$BLENDER_BIN" --version
       - name: Download Godot 4.7.2
         run: |
