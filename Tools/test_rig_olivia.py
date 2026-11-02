@@ -5,9 +5,13 @@ import io
 import json
 import re
 import struct
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
+
+sys.path.append('/usr/lib/python3/dist-packages')
+from PIL import Image
 
 import bpy
 from mathutils import Vector
@@ -44,7 +48,7 @@ image_dir.mkdir()
 extracted_images = {}
 for index, image in enumerate(gltf_json.get("images", [])):
     mime = image.get("mimeType", "image/png")
-    ext = ".jpg" if "jpeg" in mime or "jpg" in mime else ".png"
+    ext = ".jpg" if "jpeg" in mime or "jpg" in mime else ".webp" if "webp" in mime else ".png"
     if "bufferView" in image:
         view = gltf_json["bufferViews"][image["bufferView"]]
         start = view.get("byteOffset", 0)
@@ -53,9 +57,17 @@ for index, image in enumerate(gltf_json.get("images", [])):
         image_bytes = base64.b64decode(image["uri"].split(",", 1)[1])
     else:
         raise SystemExit(f"Unsupported external Olivia image reference: {image}")
-    path = image_dir / f"Image_{index}{ext}"
-    path.write_bytes(image_bytes)
-    extracted_images[index] = path
+    source_path = image_dir / f"Image_{index}{ext}"
+    source_path.write_bytes(image_bytes)
+    normalized_path = image_dir / f"Image_{index}_normalized.png"
+    try:
+        with Image.open(source_path) as source_image:
+            source_image.load()
+            mode = "RGBA" if "A" in source_image.getbands() else "RGB"
+            source_image.convert(mode).save(normalized_path, format="PNG", optimize=True)
+    except Exception as exc:
+        raise SystemExit(f"Could not decode embedded Olivia image {index} ({mime}): {exc}")
+    extracted_images[index] = normalized_path
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
