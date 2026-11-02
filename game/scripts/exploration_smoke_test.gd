@@ -43,7 +43,7 @@ func _run() -> void:
 	root.add_child(climber)
 	climber.global_position = Vector3(3.15, 0.0, 3.1)
 	var elapsed := 0.0
-	while elapsed < 5.2:
+	while elapsed < 5.2 and not (climber.global_position.y >= 2.8 and climber.global_position.z <= -2.5):
 		var dt := 1.0 / 60.0
 		if not climber.is_on_floor():
 			climber.velocity.y -= 9.8 * dt
