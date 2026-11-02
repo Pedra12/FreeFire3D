@@ -43,8 +43,16 @@ jobs:
           if not archive.is_file():
               raise SystemExit("Clocktower source archive missing from repository")
           root=Path("build/clocktower/source")
-          with zipfile.ZipFile(archive) as z:
-              z.extractall(root)
+          def unpack(path,destination,depth=0):
+              if depth>3:
+                  return
+              with zipfile.ZipFile(path) as z:
+                  z.extractall(destination)
+              for nested in list(destination.rglob("*.zip")):
+                  target=nested.parent/(nested.stem+"_extracted")
+                  if not target.exists():
+                      unpack(nested,target,depth+1)
+          unpack(archive,root)
           matches=list(root.rglob("FF CLOCKTOWER BY RATUL.blend"))
           if len(matches)!=1:
               raise SystemExit(f"Expected one Clocktower blend file, found {len(matches)}")
