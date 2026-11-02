@@ -1,7 +1,7 @@
 extends Node3D
 
 @export var loot_scene: PackedScene
-@export var max_loot: int = 14
+@export var max_loot: int = 18
 
 var loot_points: Array[Dictionary] = [
 	{"p": Vector3(-13.0, 0.0, -10.0), "t": &"ammo_sniper", "a": 10, "n": "MUNIÇÃO SNIPER", "c": Color(0.95, 0.72, 0.22)},
@@ -17,7 +17,7 @@ var loot_points: Array[Dictionary] = [
 	{"p": Vector3(21.0, 0.0, 3.0), "t": &"ammo_9mm", "a": 30, "n": "MUNIÇÃO 9MM", "c": Color(0.95, 0.72, 0.22)},
 	{"p": Vector3(-2.0, 0.0, 21.0), "t": &"helmet", "a": 1, "n": "CAPACETE", "c": Color(0.58, 0.72, 0.96)},
 	{"p": Vector3(4.0, 0.0, 4.0), "t": &"medkit", "a": 1, "n": "KIT MÉDICO", "c": Color(0.20, 0.88, 0.42)},
-	{"p": Vector3(-22.0, 0.0, 16.0), "t": &"ammo_12g", "a": 12, "n": "MUNIÇÃO CAL. 12", "c": Color(0.95, 0.72, 0.22)}
+	{"p": Vector3(-22.0, 0.0, 16.0), "t": &"ammo_12g", "a": 12, "n": "MUNIÇÃO CAL. 12", "c": Color(0.95, 0.72, 0.22)},
 	{"p": Vector3(-10.0, 0.0, -4.0), "t": &"weapon_assault_rifle", "a": 1, "n": "RIFLE DE ASSALTO", "c": Color(0.22, 0.72, 0.95)},
 	{"p": Vector3(12.0, 0.0, -9.0), "t": &"weapon_smg", "a": 1, "n": "SUBMETRALHADORA", "c": Color(0.30, 0.88, 0.72)},
 	{"p": Vector3(-17.0, 0.0, 8.0), "t": &"weapon_shotgun", "a": 1, "n": "ESCOPETA", "c": Color(0.95, 0.52, 0.22)},
