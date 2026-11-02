@@ -21,7 +21,7 @@ jobs:
       - name: Install Blender and extraction tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender unzip python3-numpy python3-pip
+          sudo apt-get install -y blender unzip python3-numpy python3-pip assimp-utils
           python3 -m pip install --break-system-packages usd-core
       - name: Recursively extract model archives
         shell: bash
@@ -48,6 +48,54 @@ jobs:
                   print('ARCHIVE_ERROR',p,e)
           print('ARCHIVES_EXTRACTED',len(seen))
           print('MODEL_FILES',sum(1 for p in out.rglob('*') if p.suffix.lower() in ('.glb','.gltf','.fbx','.obj','.blend','.usdc','.usd','.usda')))
+          PY
+      - name: Convert FBX files for independent inspection
+        shell: bash
+        run: |
+          mkdir -p /tmp/ff_assets/converted_fbx
+          find /tmp/ff_assets -type f -iname '*.fbx' -print0 | while IFS= read -r -d '' f; do
+            name=$(printf '%s' "$f" | sha256sum | cut -c1-16)
+            if assimp export "$f" "/tmp/ff_assets/converted_fbx/$name.glb"; then
+              echo "FBX_CONVERTED $f"
+            else
+              echo "FBX_CONVERSION_FAILED $f"
+            fi
+          done
+      - name: Inspect USD scenes with OpenUSD
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from pxr import Usd, UsdGeom, UsdSkel, UsdShade
+          root=Path('/tmp/ff_assets')
+          result=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.suffix.lower() in ('.usdc','.usd','.usda')):
+              item={'file':str(p.relative_to(root))}
+              try:
+                  stage=Usd.Stage.Open(str(p))
+                  if not stage: raise RuntimeError('USD stage could not be opened')
+                  meshes=[]; materials=[]; skeletons=[]; points=0; faces=0
+                  cache=UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_,UsdGeom.Tokens.render])
+                  for prim in stage.Traverse():
+                      if prim.IsA(UsdGeom.Mesh):
+                          mesh=UsdGeom.Mesh(prim); meshes.append(str(prim.GetPath()))
+                          points+=len(mesh.GetPointsAttr().Get() or [])
+                          faces+=len(mesh.GetFaceVertexCountsAttr().Get() or [])
+                      if prim.IsA(UsdShade.Material): materials.append(str(prim.GetPath()))
+                      if prim.IsA(UsdSkel.Skeleton):
+                          sk=UsdSkel.Skeleton(prim)
+                          skeletons.append({'path':str(prim.GetPath()),'joints':len(sk.GetJointsAttr().Get() or [])})
+                  box=cache.ComputeWorldBound(stage.GetPseudoRoot()).ComputeAlignedBox()
+                  item.update({'status':'ok','default_prim':str(stage.GetDefaultPrim().GetPath()) if stage.GetDefaultPrim() else None,
+                    'mesh_count':len(meshes),'mesh_paths':meshes[:100],'points':points,'faces':faces,
+                    'materials':materials,'skeletons':skeletons,
+                    'bounds_min':[float(v) for v in box.GetMin()],
+                    'bounds_max':[float(v) for v in box.GetMax()]})
+              except Exception as e: item.update({'status':'error','error':str(e)[:1000]})
+              result.append(item)
+          Path('usd-scene-audit.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          print('USD_SCENES',len(result),'OPENED',sum(x.get('status')=='ok' for x in result))
           PY
       - name: Inspect model files with Blender
         shell: bash
