@@ -101,8 +101,10 @@ if olivia_model.exists():
                     "Olivia rig report has an invalid gameplay height.")
             require(report.get("pose_test_max_deformation_m", 0) > 0.0001,
                     "Olivia rig report does not prove mesh deformation.")
-            require(report.get("source_meshes") == report.get("reimport_meshes") == 7,
-                    "Olivia FBX round-trip did not preserve all seven meshes.")
+            require(report.get("source_meshes") == report.get("glb_meshes") == 7,
+                    "Olivia GLB must preserve the seven source meshes.")
+            require(report.get("source_meshes", 0) <= report.get("reimport_meshes", 0) <= report.get("source_meshes", 0) + 2,
+                    "Olivia GLB round-trip produced an unexpected number of mesh primitives.")
             require(report.get("armature_bones", 0) >= 15,
                     "Olivia rig report contains too few humanoid bones.")
             require(report.get("glb_skins") == 1,
