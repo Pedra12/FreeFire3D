@@ -8,6 +8,7 @@ using FreeFire3D.Player;
 using FreeFire3D.World;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
