@@ -52,6 +52,18 @@ required_files = [
 for relative in required_files:
     require((ROOT / relative).is_file(), f"Missing required Unity file: {relative}")
 
+# Catch mismatches between runtime Animator calls and the parameters created
+# by the editor-side controller builder before the project reaches Unity.
+motor_source = (ROOT / "Assets/Scripts/Player/TPSPlayerMotor.cs").read_text(encoding="utf-8")
+animator_builder = (ROOT / "Assets/Editor/QuaterniusAnimationImporter.cs").read_text(encoding="utf-8")
+runtime_parameters = set(re.findall(r'animator\\.Set(?:Float|Bool|Integer|Trigger)\\(\\s*"([^"]+)"', motor_source))
+builder_parameters = set(re.findall(r'controller\\.AddParameter\\(\\s*"([^"]+)"', animator_builder))
+require(runtime_parameters <= builder_parameters,
+        "TPSPlayerMotor references Animator parameters not created by the controller builder: "
+        + ", ".join(sorted(runtime_parameters - builder_parameters)))
+require({"Speed", "Crouching", "Grounded"} <= builder_parameters,
+        "Olivia Animator Controller is missing a required locomotion parameter.")
+
 legacy_suffixes = {".gd", ".tscn", ".godot", ".import"}
 legacy_files = [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
                 if p.is_file() and p.suffix.lower() in legacy_suffixes]
