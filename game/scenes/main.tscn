@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/maps/clocktower.glb" id="1_map"]
 [ext_resource type="Script" path="res://scripts/map_collision_builder.gd" id="2_collisions"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/bot_spawner.gd" id="5_spawner"]
 [ext_resource type="PackedScene" path="res://scenes/bot.tscn" id="6_bot"]
 [ext_resource type="Script" path="res://scripts/match_manager.gd" id="9_match_manager"]
+[ext_resource type="Script" path="res://scripts/two_sided_mesh_fix.gd" id="10_mesh_fix"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMaterial_main"]
 sky_top_color = Color(0.12, 0.28, 0.48, 1)
@@ -74,3 +75,6 @@ bot_count = 7
 
 [node name="MatchManager" type="Node" parent="."]
 script = ExtResource("9_match_manager")
+
+[node name="TwoSidedMeshFix" type="Node" parent="."]
+script = ExtResource("10_mesh_fix")
