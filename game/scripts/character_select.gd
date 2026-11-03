@@ -66,7 +66,7 @@ func _build_screen() -> void:
 
 func _select_class(index:int) -> void:
 	selected_index=clampi(index,0,CLASS_IDS.size()-1)
-	var class_id:=CLASS_IDS[selected_index]
+	var class_id: String = CLASS_IDS[selected_index]
 	MatchConfig.set_selected(class_id)
 	var data:Dictionary=MatchConfig.get_selected()
 	detail_label.text="CLASSE: "+String(data["title"])+"   |   ARMA: "+String(data["weapon_name"])+"\n"+String(data["special"])
