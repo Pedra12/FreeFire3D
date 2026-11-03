@@ -56,8 +56,16 @@ for relative in required_files:
 # by the editor-side controller builder before the project reaches Unity.
 motor_source = (ROOT / "Assets/Scripts/Player/TPSPlayerMotor.cs").read_text(encoding="utf-8")
 animator_builder = (ROOT / "Assets/Editor/QuaterniusAnimationImporter.cs").read_text(encoding="utf-8")
-runtime_parameters = set(re.findall(r'animator\\.Set(?:Float|Bool|Integer|Trigger)\\(\\s*"([^"]+)"', motor_source))
-builder_parameters = set(re.findall(r'controller\\.AddParameter\\(\\s*"([^"]+)"', animator_builder))
+runtime_parameters = {
+    line.split('"')[1]
+    for line in motor_source.splitlines()
+    if "animator.Set" in line and '"' in line
+}
+builder_parameters = {
+    line.split('"')[1]
+    for line in animator_builder.splitlines()
+    if "controller.AddParameter" in line and '"' in line
+}
 require(runtime_parameters <= builder_parameters,
         "TPSPlayerMotor references Animator parameters not created by the controller builder: "
         + ", ".join(sorted(runtime_parameters - builder_parameters)))
