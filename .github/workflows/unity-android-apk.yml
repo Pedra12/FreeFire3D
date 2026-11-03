@@ -1,0 +1,49 @@
+name: Build FreeFire3D Android APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unity-android-apk
+  cancel-in-progress: false
+
+jobs:
+  build-android:
+    name: Import, validate and build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout standalone Unity project
+        uses: actions/checkout@v4
+        with:
+          ref: unity-project
+          lfs: true
+      - name: Check Unity Personal license secret
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          if [ -z "$UNITY_LICENSE" ]; then
+            echo "::error::Add the Unity .ulf file contents as the UNITY_LICENSE repository Actions secret before running this workflow."
+            exit 1
+          fi
+      - name: Build and validate Android APK with Unity 6
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: .
+          unityVersion: auto
+          targetPlatform: Android
+          buildMethod: FreeFire3D.EditorTools.AndroidCiBuilder.Build
+          buildName: FreeFire3D
+          buildsPath: build
+          androidExportType: androidPackage
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeFire3D-Android-APK
+          path: build/Android/FreeFire3D.apk
+          if-no-files-found: error
+          retention-days: 14
