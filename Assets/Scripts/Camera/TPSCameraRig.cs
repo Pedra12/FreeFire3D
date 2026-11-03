@@ -22,6 +22,7 @@ namespace FreeFire3D.CameraSystem
         private float yaw;
         private float pitch = 12f;
         private Vector2 pendingLook;
+        private static readonly RaycastHit[] collisionHits = new RaycastHit[16];
 
         public Transform CameraTransform => transform;
 
@@ -50,12 +51,35 @@ namespace FreeFire3D.CameraSystem
 
             Vector3 castDirection = desiredPosition - focusPoint;
             float castDistance = castDirection.magnitude;
-            if (castDistance > 0.001f &&
-                Physics.SphereCast(focusPoint, collisionRadius, castDirection.normalized,
-                    out RaycastHit hit, castDistance, collisionMask, QueryTriggerInteraction.Ignore))
+            if (castDistance > 0.001f)
             {
-                desiredPosition = focusPoint + castDirection.normalized *
-                    Mathf.Max(0.15f, hit.distance - collisionRadius);
+                int hitCount = Physics.SphereCastNonAlloc(
+                    focusPoint, collisionRadius, castDirection.normalized,
+                    collisionHits, castDistance, collisionMask, QueryTriggerInteraction.Ignore);
+
+                float nearestDistance = castDistance;
+                bool foundObstacle = false;
+
+                for (int i = 0; i < hitCount; i++)
+                {
+                    Transform hitTransform = collisionHits[i].transform;
+                    if (hitTransform == null ||
+                        hitTransform == target ||
+                        hitTransform.IsChildOf(target))
+                        continue;
+
+                    if (collisionHits[i].distance < nearestDistance)
+                    {
+                        nearestDistance = collisionHits[i].distance;
+                        foundObstacle = true;
+                    }
+                }
+
+                if (foundObstacle)
+                {
+                    desiredPosition = focusPoint + castDirection.normalized *
+                        Mathf.Max(0.15f, nearestDistance - collisionRadius);
+                }
             }
 
             float blend = 1f - Mathf.Exp(-followSharpness * Time.deltaTime);
