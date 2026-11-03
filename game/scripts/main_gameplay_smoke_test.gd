@@ -80,8 +80,20 @@ func _run_test() -> void:
 		return
 
 	var bot_weapons := 0
+	var expected_weapons := {
+		"assault": "assault_rifle",
+		"medic": "smg",
+		"support": "shotgun",
+		"recon": "awm"
+	}
 	for bot in bots:
 		var bot_mount := bot.get_node_or_null("WeaponMount")
+		var bot_class := String(bot.get("class_id"))
+		var bot_weapon := String(bot.get("weapon_id"))
+		if not expected_weapons.has(bot_class) or expected_weapons[bot_class] != bot_weapon:
+			push_error("MAIN_GAMEPLAY_TEST_FAILED: bot class/weapon mismatch class=%s weapon=%s" % [bot_class, bot_weapon])
+			quit(1)
+			return
 		if bot_mount != null and bot_mount.get("mounted_weapon") != null:
 			bot_weapons += 1
 	if bot_weapons != 7:
@@ -89,6 +101,12 @@ func _run_test() -> void:
 		quit(1)
 		return
 
+	var match_manager := scene.get_node_or_null("MatchManager")
+	var bot_spawner := scene.get_node_or_null("BotSpawner")
+	if match_manager == null or bot_spawner == null or not hud.has_method("set_round_info") or not hud.has_method("show_match_result"):
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: round manager, bot spawner or round HUD integration missing")
+		quit(1)
+		return
 	var combat := player.get_node_or_null("CombatController")
 	if scene.get_node_or_null("LootSpawner") != null or scene.find_children("*", "Area3D", true, false).any(func(n): return n.is_in_group("loot")):
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: loot system must be absent in 4v4 team mode")
