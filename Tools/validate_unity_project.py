@@ -62,6 +62,9 @@ require("UNITY_SCENE_VALIDATION_OK" in android_builder_source,
         "Android CI entry point is missing its scene validation checkpoint.")
 require("AndroidArchitecture.ARM64" in android_builder_source,
         "Android CI build is not restricted to the supported ARM64 architecture.")
+require("ScriptingImplementation.IL2CPP" in android_builder_source and
+        "UIOrientation.LandscapeLeft" in android_builder_source,
+        "Android player must use IL2CPP ARM64 and landscape orientation.")
 require("workflow_dispatch:" in android_workflow_source and
         "game-ci/unity-builder@v4" in android_workflow_source and
         "targetPlatform: Android" in android_workflow_source,
