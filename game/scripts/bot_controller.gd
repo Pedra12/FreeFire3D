@@ -3,6 +3,8 @@ extends CharacterBody3D
 signal eliminated(team_id: int, killer_team: int)
 
 @export var team_id: int = 1
+@export var class_id: StringName = &"assault"
+@export var weapon_id: StringName = &"assault_rifle"
 @export var maximum_health: float = 100.0
 @export var move_speed: float = 3.0
 @export var detection_range: float = 52.0
@@ -149,7 +151,7 @@ func _attack_target() -> void:
 	if not is_instance_valid(target):
 		return
 	ammo_in_magazine -= 1
-	_play_action(&"Pistol_Shoot")
+	_play_action(_shoot_animation_for_weapon())
 	var from := global_position + Vector3.UP * 1.2
 	var to := target.global_position + Vector3.UP * 1.15
 	var spread := Vector3(randf_range(-0.045, 0.045), randf_range(-0.035, 0.035), randf_range(-0.045, 0.045))
@@ -163,6 +165,22 @@ func _attack_target() -> void:
 			collider.call("apply_damage", attack_damage, hit.position, hit.normal, self)
 	if ammo_in_magazine <= 0:
 		_reload()
+
+func _shoot_animation_for_weapon() -> StringName:
+	var candidates: Array[StringName] = []
+	match weapon_id:
+		&"awm":
+			candidates = [&"Sniper_Shoot", &"Rifle_Shoot", &"Pistol_Shoot"]
+		&"shotgun":
+			candidates = [&"Shotgun_Shoot", &"Rifle_Shoot", &"Pistol_Shoot"]
+		&"smg":
+			candidates = [&"SMG_Shoot", &"Rifle_Shoot", &"Pistol_Shoot"]
+		_:
+			candidates = [&"Rifle_Shoot", &"Assault_Rifle_Shoot", &"Pistol_Shoot"]
+	for clip in candidates:
+		if animation_player != null and animation_player.has_animation(clip):
+			return clip
+	return &"Pistol_Shoot"
 
 func _reload() -> void:
 	if reloading:
