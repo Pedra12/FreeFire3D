@@ -3,7 +3,10 @@ config_version=5
 [application]
 config/name="FreeFire3D - Clocktower 4v4"
 config/icon="res://icon.svg"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/character_select.tscn"
+
+[autoload]
+MatchConfig="*res://scripts/match_config.gd"
 
 [display]
 window/size/viewport_width=1280
