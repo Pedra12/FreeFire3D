@@ -86,50 +86,15 @@ func _run_test() -> void:
 		quit(1)
 		return
 
-	var loot_nodes := scene.get_node("LootSpawner").get_children()
-	if loot_nodes.size() < 14:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: too few loot pickups spawned: %d" % loot_nodes.size())
-		quit(1)
-		return
-	var weapon_loot_count := 0
-	for loot in loot_nodes:
-		if String(loot.get("item_type")).begins_with("weapon_"):
-			weapon_loot_count += 1
-			if loot.get("weapon_visual") == null:
-				push_error("MAIN_GAMEPLAY_TEST_FAILED: 3D weapon loot visual missing for " + String(loot.get("item_type")))
-				quit(1)
-				return
-	if weapon_loot_count != 4:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: expected 4 weapon loot models, found %d" % weapon_loot_count)
-		quit(1)
-		return
-
-	var ammo_pickup: Node = null
-	var rifle_pickup: Node = null
-	for loot in loot_nodes:
-		if loot.get("item_type") == &"ammo_556":
-			ammo_pickup = loot
-		if loot.get("item_type") == &"weapon_assault_rifle":
-			rifle_pickup = loot
-	if ammo_pickup == null or rifle_pickup == null:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: ammo or rifle pickup missing")
-		quit(1)
-		return
-	var ammo_before := int(inventory.get("ammo_556"))
-	ammo_pickup.call("_on_body_entered", player)
-	if int(inventory.get("ammo_556")) != ammo_before + 30:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: 5.56 pickup did not add matching ammunition")
-		quit(1)
-		return
 	var combat := player.get_node_or_null("CombatController")
-	rifle_pickup.call("_on_body_entered", player)
-	await create_timer(0.15).timeout
-	if combat == null or combat.get("current_weapon_id") != &"assault_rifle" or weapon_mount.get("current_weapon_id") != &"assault_rifle" or weapon_mount.get("mounted_weapon") == null or int(combat.get("reserve_ammo")) != 90 or int(hud.get("ammo_reserve")) != 90:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: rifle pickup did not equip model and combat profile")
+	if scene.get_node_or_null("LootSpawner") != null or scene.find_children("*", "Area3D", true, false).any(func(n): return n.is_in_group("loot")):
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: loot system must be absent in 4v4 team mode")
 		quit(1)
 		return
-	print("LOOT_PICKUP_TEST_OK: rifle model equipped and 5.56 ammo collected")
-
+	if player.get("team_id") != 0:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: player must deploy on blue team")
+		quit(1)
+		return
 	var allied_bot: Node = null
 	var enemy_bot: Node = null
 	for bot in bots:
