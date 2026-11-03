@@ -106,7 +106,11 @@ func set_inventory(snapshot: Dictionary) -> void:
 	inventory_snapshot = snapshot.duplicate(true)
 	queue_redraw()
 
-func set_round_info(round_number: int, target: int, seconds_left: float) -> void:\n\tround_info = "ROUND %d  |  %d PARA VENCER  |  %02d:%02d" % [round_number, target, int(seconds_left) / 60, int(seconds_left) % 60]\n\tqueue_redraw()\n\nfunc set_match_status(status: String, score: String) -> void:
+func set_round_info(round_number: int, target: int, seconds_left: float) -> void:
+	round_info = "ROUND %d  |  %d PARA VENCER  |  %02d:%02d" % [round_number, target, int(seconds_left) / 60, int(seconds_left) % 60]
+	queue_redraw()
+
+func set_match_status(status: String, score: String) -> void:
 	match_status = status
 	score_text = score
 	queue_redraw()
@@ -231,7 +235,8 @@ func _draw() -> void:
 	var health_color := Color(0.20, 0.82, 0.36, 0.95) if health_current > 35.0 else Color(0.95, 0.24, 0.16, 0.98)
 	draw_rect(Rect2(28, 75, 180.0 * clampf(health_current / health_maximum, 0.0, 1.0), 10), health_color, true)
 	draw_string(font, Vector2(size.x * 0.5 - 120.0, 38.0), match_status, HORIZONTAL_ALIGNMENT_CENTER, 240.0, 17, Color.WHITE)
-	draw_string(font, Vector2(size.x * 0.5 - 50.0, 62.0), score_text, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 14, Color(1.0, 0.82, 0.34))\n\tdraw_string(font, Vector2(size.x * 0.5 - 150.0, 84.0), round_info, HORIZONTAL_ALIGNMENT_CENTER, 300.0, 12, Color(0.9, 0.94, 1.0))
+	draw_string(font, Vector2(size.x * 0.5 - 50.0, 62.0), score_text, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 14, Color(1.0, 0.82, 0.34))
+	draw_string(font, Vector2(size.x * 0.5 - 150.0, 84.0), round_info, HORIZONTAL_ALIGNMENT_CENTER, 300.0, 12, Color(0.9, 0.94, 1.0))
 	var ammo_text := "%s  %02d / %03d" % [weapon_label, ammo_current, ammo_reserve]
 	draw_string(font, Vector2(size.x - 195.0, 48.0), ammo_text, HORIZONTAL_ALIGNMENT_RIGHT, 170.0, 19, Color.WHITE)
 	if aiming:
