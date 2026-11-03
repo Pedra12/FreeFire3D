@@ -1,0 +1,43 @@
+{
+  "asset": "Clocktower",
+  "source": "RS RATUL, Free Fire Clocktower 3D Model By Rs Ratul",
+  "license": "CC BY (attribution required)",
+  "source_url": "https://sketchfab.com/3d-models/free-fire-clocktower-3d-model-by-rs-ratul-70c66345c0b745f98972eaff255a494b",
+  "canonical_model": "Clocktower.glb",
+  "source_format_selected": "FBX only",
+  "excluded_alternates": [
+    "BLEND",
+    "OBJ"
+  ],
+  "source_mesh_objects": 38,
+  "source_vertices": 46176,
+  "source_faces": 26307,
+  "source_bounds_size_m": [
+    87.249,
+    113.65,
+    27.566
+  ],
+  "base_top_z_before_centering": 27.755,
+  "texture_references_relinked": 11,
+  "texture_names": [
+    "Zone_A_House_other.png",
+    "Zone_A_House_other03.png",
+    "Zone_A_House_tile.png",
+    "Zone_A_House_wall01.png",
+    "Zone_A_House_wall03.png",
+    "base_01-CAB-64ac35ddc9bb0d746c52bac29f0894.png",
+    "concrete_wall_01D_D.png",
+    "fixatap.png",
+    "tex_0000_0out-tex_0000_0out_png.png",
+    "tex_0000_0out_png-tex_0000_0out_png.png",
+    "tower_01.png"
+  ],
+  "texture_references_missing": 0,
+  "glb_meshes": 38,
+  "glb_materials": 38,
+  "glb_images": 10,
+  "used_source_texture_images": 10,
+  "glb_nodes": 38,
+  "file_size_bytes": 11783204,
+  "sha256": "53f613d48b4d4a14fad4c611e1f0ca66bae3b25849fe9aeafadbdd506ff7e54c"
+}
