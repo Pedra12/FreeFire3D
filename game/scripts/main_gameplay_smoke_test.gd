@@ -123,5 +123,5 @@ func _run_test() -> void:
 		quit(1)
 		return
 
-	print("MAIN_GAMEPLAY_TEST_OK: map=Clocktower meshes=", map_meshes.size(), " bots=7 teams=3+4 loot=", loot_nodes.size(), " weapon_loot=", weapon_loot_count, " player_inventory=OK weapon_classes=5 friendly_fire=OFF")
+	print("MAIN_GAMEPLAY_TEST_OK: map=Clocktower meshes=", map_meshes.size(), " bots=7 teams=4+4 loot=0 player_inventory=OK weapon_mounts=8 friendly_fire=OFF")
 	quit(0)
