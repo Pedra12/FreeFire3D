@@ -44,7 +44,7 @@ namespace FreeFire3D.EditorTools
         }
 
         [MenuItem("FreeFire3D/Build Olivia Humanoid Avatar")]
-        private static void BuildAvatar()
+        public static void BuildAvatar()
         {
             GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
             if (modelAsset == null)
