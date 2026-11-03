@@ -27,6 +27,9 @@ func _scan_tree(root: Node) -> void:
 		_scan_tree(child)
 
 func _fix_mesh(mesh_node: MeshInstance3D) -> void:
+	var mesh_id := mesh_node.get_instance_id()
+	if _seen.has(mesh_id):
+		return
 	var mesh := mesh_node.mesh
 	if mesh == null:
 		return
@@ -42,3 +45,4 @@ func _fix_mesh(mesh_node: MeshInstance3D) -> void:
 			var base := (material as BaseMaterial3D).duplicate() as BaseMaterial3D
 			base.cull_mode = BaseMaterial3D.CULL_DISABLED
 			mesh_node.set_surface_override_material(surface, base)
+	_seen[mesh_id] = true
