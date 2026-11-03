@@ -16,6 +16,7 @@ var hud: Control
 var spawner: Node
 var round_timer := 0.0
 var _transitioning := false
+var _hud_refresh_clock := 0.0
 
 func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
@@ -40,6 +41,10 @@ func _process(delta: float) -> void:
 	if match_over or round_over:
 		return
 	round_timer = maxf(0.0, round_timer - delta)
+	_hud_refresh_clock -= delta
+	if _hud_refresh_clock <= 0.0:
+		_hud_refresh_clock = 0.25
+		_update_hud()
 	if round_timer <= 0.0:
 		_finish_round(_round_winner_by_alive())
 
@@ -126,6 +131,6 @@ func _update_hud() -> void:
 	if not is_instance_valid(hud): return
 	var alive := _alive_counts()
 	if hud.has_method("set_match_status"):
-		hud.call("set_match_status", "AZUL %d | %d VERMELHO" % alive, "%d x %d  •  R%d" % [round_scores[0], round_scores[1], round_number])
+		hud.call("set_match_status", "AZUL %d | %d VERMELHO" % alive, "%d x %d  •  R%d  •  K %d:%d" % [round_scores[0], round_scores[1], round_number, team_kills[0], team_kills[1]])
 	if hud.has_method("set_round_info"):
 		hud.call("set_round_info", round_number, rounds_to_win, round_timer)
