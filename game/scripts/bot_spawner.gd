@@ -41,7 +41,7 @@ func _spawn_teams() -> void:
 			continue
 		var team := 0 if i < 3 else 1
 		bot.set("team_id", team)
-		var class_id := ["assault", "medic", "support", "recon"][i % 4]
+		var class_id: String = ["assault", "medic", "support", "recon"][i % 4]
 		var class_data: Dictionary = MatchConfig.CLASSES[class_id]
 		var weapon_id := StringName(String(class_data["weapon"]))
 		get_parent().add_child(bot)
