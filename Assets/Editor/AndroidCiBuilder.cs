@@ -7,6 +7,7 @@ using FreeFire3D.Match;
 using FreeFire3D.Player;
 using FreeFire3D.World;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
@@ -199,7 +200,9 @@ namespace FreeFire3D.EditorTools
             PlayerSettings.bundleVersion = "0.1.0";
             PlayerSettings.Android.bundleVersionCode = 1;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
-            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.pedra12.freefire3d");
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.pedra12.freefire3d");
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
 
             Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
             BuildPlayerOptions options = new BuildPlayerOptions
