@@ -28,7 +28,7 @@ func _run_test() -> void:
 		return
 
 	var map_node := scene.get_node_or_null("Map") as Node3D
-	if map_node == null or not map_node.scene_file_path.ends_with("river_side.glb"):
+	if map_node == null or not map_node.scene_file_path.ends_with("clocktower.glb"):
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene is not using River Side")
 		quit(1)
 		return
@@ -37,8 +37,8 @@ func _run_test() -> void:
 		quit(1)
 		return
 	var map_meshes := map_node.find_children("*", "MeshInstance3D", true, false)
-	if map_meshes.size() < 400:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: River Side geometry incomplete, meshes=%d" % map_meshes.size())
+	if map_meshes.size() < 30:
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: Clocktower geometry incomplete, meshes=%d" % map_meshes.size())
 		quit(1)
 		return
 
@@ -158,5 +158,5 @@ func _run_test() -> void:
 		quit(1)
 		return
 
-	print("MAIN_GAMEPLAY_TEST_OK: map=RiverSide meshes=", map_meshes.size(), " bots=7 teams=3+4 loot=", loot_nodes.size(), " weapon_loot=", weapon_loot_count, " player_inventory=OK weapon_classes=5 friendly_fire=OFF")
+	print("MAIN_GAMEPLAY_TEST_OK: map=Clocktower meshes=", map_meshes.size(), " bots=7 teams=3+4 loot=", loot_nodes.size(), " weapon_loot=", weapon_loot_count, " player_inventory=OK weapon_classes=5 friendly_fire=OFF")
 	quit(0)
