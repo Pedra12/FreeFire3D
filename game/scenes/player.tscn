@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/player_controller.gd" id="1_controller"]
 [ext_resource type="PackedScene" path="res://assets/characters/olivia_rigged.glb" id="2_model"]
@@ -6,7 +6,6 @@
 [ext_resource type="Script" path="res://scripts/player_health.gd" id="4_health"]
 [ext_resource type="Script" path="res://scripts/weapon_mount.gd" id="5_weapon"]
 [ext_resource type="Script" path="res://scripts/inventory.gd" id="6_inventory"]
-[ext_resource type="AudioStream" path="res://assets/audio/footstep00.ogg" id="7_footstep"]
 
 [sub_resource type="CapsuleShape3D" id="Capsule_player"]
 radius = 0.255
@@ -45,8 +44,3 @@ script = ExtResource("6_inventory")
 
 [node name="WeaponMount" type="Node3D" parent="."]
 script = ExtResource("5_weapon")
-
-[node name="FootstepAudio" type="AudioStreamPlayer3D" parent="."]
-stream = ExtResource("7_footstep")
-volume_db = -8.0
-max_distance = 18.0
