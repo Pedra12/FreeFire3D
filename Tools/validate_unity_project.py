@@ -47,6 +47,8 @@ required_files = [
     "Assets/Editor/QuaterniusAnimationImporter.cs",
     "Tools/inspect_quaternius_fbx.py",
     "Assets/Editor/InitialMatchSceneBuilder.cs",
+    "Assets/Editor/AndroidCiBuilder.cs",
+    ".github/workflows/unity-android-apk.yml",
     "Assets/Documentation/CONTENT_SELECTION.md",
 ]
 for relative in required_files:
