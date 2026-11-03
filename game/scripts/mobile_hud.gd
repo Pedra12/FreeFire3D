@@ -46,6 +46,7 @@ var hitmarker_timer: float = 0.0
 var hitmarker_kill: bool = false
 var hitmarker_headshot: bool = false
 var result_text: String = ""
+var minimap_refresh_clock: float = 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -56,7 +57,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	toast_timer = maxf(0.0, toast_timer - delta)
 	hitmarker_timer = maxf(0.0, hitmarker_timer - delta)
-	if toast_timer > 0.0 or hitmarker_timer > 0.0:
+	minimap_refresh_clock -= delta
+	if toast_timer > 0.0 or hitmarker_timer > 0.0 or minimap_refresh_clock <= 0.0:
+		minimap_refresh_clock = 0.12
 		queue_redraw()
 
 func _on_viewport_resized() -> void:
@@ -247,6 +250,7 @@ func _draw() -> void:
 	draw_string(font, Vector2(size.x * 0.5 - 150.0, 84.0), round_info, HORIZONTAL_ALIGNMENT_CENTER, 300.0, 12, Color(0.9, 0.94, 1.0))
 	var ammo_text := "%s  %02d / %03d" % [weapon_label, ammo_current, ammo_reserve]
 	draw_string(font, Vector2(size.x - 195.0, 48.0), ammo_text, HORIZONTAL_ALIGNMENT_RIGHT, 170.0, 19, Color.WHITE)
+	_draw_minimap()
 	if aiming:
 		var center := size * 0.5
 		draw_line(center + Vector2(-10, 0), center + Vector2(-3, 0), Color.WHITE, 2.0)
@@ -272,6 +276,37 @@ func _draw() -> void:
 	if result_text != "":
 		draw_rect(Rect2(size.x * 0.5 - 190.0, size.y * 0.5 - 85.0, 380.0, 170.0), Color(0.02, 0.04, 0.07, 0.88), true)
 		draw_string(font, Vector2(size.x * 0.5, size.y * 0.5 + 12.0), result_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 42, Color(0.95, 0.82, 0.28))
+
+
+func _draw_minimap() -> void:
+	var player := get_tree().get_first_node_in_group("player") as Node3D
+	if player == null:
+		return
+	var panel_size := 142.0
+	var panel := Rect2(size.x - panel_size - 24.0, 88.0, panel_size, panel_size)
+	draw_rect(panel, Color(0.015, 0.025, 0.04, 0.72), true)
+	draw_rect(panel, Color(0.72, 0.82, 0.92, 0.75), false, 1.5)
+	var center := panel.position + panel.size * 0.5
+	var radius := 58.0
+	draw_circle(center, radius, Color(0.10, 0.15, 0.19, 0.52))
+	draw_arc(center, radius, 0.0, TAU, 48, Color(0.68, 0.78, 0.88, 0.42), 1.0, true)
+	draw_line(center + Vector2(-radius, 0), center + Vector2(radius, 0), Color(0.68, 0.78, 0.88, 0.22), 1.0)
+	draw_line(center + Vector2(0, -radius), center + Vector2(0, radius), Color(0.68, 0.78, 0.88, 0.22), 1.0)
+	var player_team := int(player.get("team_id"))
+	var basis := player.global_transform.basis
+	for actor in get_tree().get_nodes_in_group("combatants"):
+		if not actor is Node3D or actor == player:
+			continue
+		var offset: Vector3 = player.global_transform.basis.inverse() * ((actor as Node3D).global_position - player.global_position)
+		var point := Vector2(offset.x, -offset.z) * (radius / 42.0)
+		if point.length() > radius - 4.0:
+			point = point.normalized() * (radius - 4.0)
+		var team := int(actor.get("team_id"))
+		var dot_color := Color(0.20, 0.68, 1.0, 0.95) if team == player_team else Color(1.0, 0.25, 0.18, 0.98)
+		draw_circle(center + point, 4.0, dot_color)
+	draw_circle(center, 5.0, Color(1.0, 0.88, 0.32, 1.0))
+	draw_line(center, center + Vector2(0, -12), Color(1.0, 0.88, 0.32, 1.0), 2.0)
+	draw_string(ThemeDB.fallback_font, Vector2(panel.position.x + 8.0, panel.position.y + 16.0), "RADAR", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
 
 func _draw_inventory(font: Font) -> void:
 	var panel := Rect2(size.x * 0.5 - 220.0, size.y * 0.5 - 190.0, 440.0, 380.0)
