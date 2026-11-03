@@ -288,3 +288,5 @@ func _draw_button(center: Vector2, label: String, active: bool, radius: float = 
 	var font_size := 15 if radius > 38.0 else 11
 	var width: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	draw_string(font, center + Vector2(-width * 0.5, 5.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
+
+# Competitive round HUD extension validated for Android export.
