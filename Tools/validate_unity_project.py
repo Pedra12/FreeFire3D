@@ -54,6 +54,19 @@ required_files = [
 for relative in required_files:
     require((ROOT / relative).is_file(), f"Missing required Unity file: {relative}")
 
+android_builder_source = (ROOT / "Assets/Editor/AndroidCiBuilder.cs").read_text(encoding="utf-8")
+android_workflow_source = (ROOT / ".github/workflows/unity-android-apk.yml").read_text(encoding="utf-8")
+require("BuildPipeline.BuildPlayer(options)" in android_builder_source,
+        "Android CI entry point does not invoke Unity's real BuildPipeline.")
+require("UNITY_SCENE_VALIDATION_OK" in android_builder_source,
+        "Android CI entry point is missing its scene validation checkpoint.")
+require("AndroidArchitecture.ARM64" in android_builder_source,
+        "Android CI build is not restricted to the supported ARM64 architecture.")
+require("workflow_dispatch:" in android_workflow_source and
+        "game-ci/unity-builder@v4" in android_workflow_source and
+        "targetPlatform: Android" in android_workflow_source,
+        "Manual Unity 6 Android APK workflow is incomplete.")
+
 # Catch mismatches between runtime Animator calls and the parameters created
 # by the editor-side controller builder before the project reaches Unity.
 motor_source = (ROOT / "Assets/Scripts/Player/TPSPlayerMotor.cs").read_text(encoding="utf-8")
