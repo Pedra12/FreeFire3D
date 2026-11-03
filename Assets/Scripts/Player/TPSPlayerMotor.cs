@@ -164,11 +164,10 @@ namespace FreeFire3D.Player
 
             if (animator != null)
             {
+                // Keep runtime parameters exactly aligned with Olivia.controller.
+                // Undefined Animator parameters produce warnings and hide real import issues.
                 animator.SetFloat("Speed", HorizontalVelocity.magnitude, 0.1f, deltaTime);
-                animator.SetFloat("MoveX", moveInput.x, 0.1f, deltaTime);
-                animator.SetFloat("MoveY", moveInput.y, 0.1f, deltaTime);
                 animator.SetBool("Grounded", controller.isGrounded);
-                animator.SetBool("Sprinting", sprintHeld && moveInput.sqrMagnitude > 0.01f);
                 animator.SetBool("Crouching", IsCrouched);
             }
         }
