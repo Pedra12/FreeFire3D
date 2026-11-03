@@ -41,7 +41,31 @@ func _spawn_teams() -> void:
 		 continue
 		var team := 0 if i < 3 else 1
 		bot.set("team_id", team)
+		var class_id := ["assault", "medic", "support", "recon"][i % 4]
+		var class_data: Dictionary = MatchConfig.CLASSES[class_id]
+		var weapon_id := StringName(String(class_data["weapon"]))
 		get_parent().add_child(bot)
+		var mount := bot.get_node_or_null("WeaponMount")
+		if mount != null:
+			mount.call("equip_weapon", weapon_id)
+		match weapon_id:
+			&"assault_rifle":
+				bot.set("attack_damage", 28.0)
+				bot.set("attack_interval", 0.18)
+				bot.set("attack_range", 38.0)
+			&"smg":
+				bot.set("attack_damage", 20.0)
+				bot.set("attack_interval", 0.14)
+				bot.set("attack_range", 24.0)
+			&"shotgun":
+				bot.set("attack_damage", 34.0)
+				bot.set("attack_interval", 0.9)
+				bot.set("attack_range", 12.0)
+			&"awm":
+				bot.set("attack_damage", 48.0)
+				bot.set("attack_interval", 1.25)
+				bot.set("attack_range", 52.0)
+		print("BOT_CLASS class=", class_id, " weapon=", weapon_id)
 		var offset: Vector3 = BLUE_OFFSETS[i] if team == 0 else RED_OFFSETS[i - 3]
 		var base: Vector3 = BLUE_SPAWN if team == 0 else RED_SPAWN
 		bot.global_position = _ground_position(base + offset, bot)
