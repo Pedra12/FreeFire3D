@@ -8,6 +8,7 @@ var class_buttons: Array[Button] = []
 func _ready() -> void:
 	_build_screen()
 	_select_class(0)
+	print("CHARACTER_SELECT_READY classes=", CLASS_IDS.size(), " selected=", MatchConfig.selected_class)
 
 func _build_screen() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
