@@ -53,6 +53,7 @@ func _ready() -> void:
 	await _find_ground_and_place()
 	_play_first_available([&"Idle_Loop", &"Idle", &"idle", &"Idle_Rifle"])
 	_on_inventory_changed(inventory.call("get_snapshot") if inventory != null else {})
+	_apply_selected_loadout()
 
 func _find_ground_and_place() -> void:
 	var map_node := get_parent().get_node_or_null("Map")
@@ -272,3 +273,28 @@ func _play_first_available(names: Array[StringName]) -> void:
 			current_animation = animation_name
 			animation_player.play(animation_name, 0.18)
 			return
+
+func _apply_selected_loadout() -> void:
+	if not is_instance_valid(MatchConfig):
+		return
+	var data: Dictionary = MatchConfig.get_selected()
+	var weapon_id := StringName(String(data.get("weapon", "assault_rifle")))
+	var mount := get_node_or_null("WeaponMount")
+	var combat := get_node_or_null("CombatController")
+	if mount != null:
+		mount.call("equip_weapon", weapon_id)
+	if combat != null:
+		combat.call("equip_weapon", weapon_id)
+	if inventory != null:
+		match weapon_id:
+			&"assault_rifle":
+				inventory.set("ammo_556", 120)
+			&"smg":
+				inventory.set("ammo_9mm", 120)
+				inventory.set("medkits", 4)
+			&"shotgun":
+				inventory.set("ammo_12g", 36)
+			&"awm":
+				inventory.set("ammo_sniper", 20)
+		inventory.call("_emit_changed")
+	print("PLAYER_CLASS_SELECTED ", data.get("title", "ASSALTO"), " weapon=", weapon_id)
