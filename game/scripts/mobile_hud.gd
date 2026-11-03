@@ -243,7 +243,7 @@ func _draw() -> void:
 	var health_color := Color(0.20, 0.82, 0.36, 0.95) if health_current > 35.0 else Color(0.95, 0.24, 0.16, 0.98)
 	draw_rect(Rect2(28, 75, 180.0 * clampf(health_current / health_maximum, 0.0, 1.0), 10), health_color, true)
 	draw_string(font, Vector2(size.x * 0.5 - 120.0, 38.0), match_status, HORIZONTAL_ALIGNMENT_CENTER, 240.0, 17, Color.WHITE)
-	draw_string(font, Vector2(size.x * 0.5 - 50.0, 62.0), score_text, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 14, Color(1.0, 0.82, 0.34))
+	draw_string(font, Vector2(size.x * 0.5 - 160.0, 62.0), score_text, HORIZONTAL_ALIGNMENT_CENTER, 320.0, 14, Color(1.0, 0.82, 0.34))
 	draw_string(font, Vector2(size.x * 0.5 - 150.0, 84.0), round_info, HORIZONTAL_ALIGNMENT_CENTER, 300.0, 12, Color(0.9, 0.94, 1.0))
 	var ammo_text := "%s  %02d / %03d" % [weapon_label, ammo_current, ammo_reserve]
 	draw_string(font, Vector2(size.x - 195.0, 48.0), ammo_text, HORIZONTAL_ALIGNMENT_RIGHT, 170.0, 19, Color.WHITE)
