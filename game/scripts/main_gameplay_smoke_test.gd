@@ -4,7 +4,7 @@ func _initialize() -> void:
 	call_deferred("_run_test")
 
 func _run_test() -> void:
-	var packed := load("res://scenes/main.tscn") as PackedScene
+	MatchConfig.set_selected("recon")\n\tvar packed := load("res://scenes/main.tscn") as PackedScene
 	if packed == null:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene unavailable")
 		quit(1)
@@ -29,7 +29,7 @@ func _run_test() -> void:
 
 	var map_node := scene.get_node_or_null("Map") as Node3D
 	if map_node == null or not map_node.scene_file_path.ends_with("clocktower.glb"):
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene is not using River Side")
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene is not using Clocktower")
 		quit(1)
 		return
 	if not bool(map_node.get("is_ready_for_queries")):
@@ -68,7 +68,7 @@ func _run_test() -> void:
 		quit(1)
 		return
 	if weapon_mount.get("mounted_weapon") == null:
-		push_error("MAIN_GAMEPLAY_TEST_FAILED: player AWM not attached to hand")
+		push_error("MAIN_GAMEPLAY_TEST_FAILED: selected AWM not attached to hand")
 		quit(1)
 		return
 	if int(inventory.get("ammo_sniper")) != 20 or int(inventory.get("ammo_556")) != 60 or int(inventory.get("ammo_9mm")) != 45 or int(inventory.get("ammo_12g")) != 12 or int(inventory.get("medkits")) != 2 or int(inventory.get("grenades")) != 1:
