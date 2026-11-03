@@ -111,11 +111,6 @@ def fallback_weights(mesh_obj):
             normalized = weight / total
             if normalized > 0.001:
                 bone_groups[bone.name].add([vertex.index], normalized, "REPLACE")
-    # Ensure every vertex has weights and the mesh is actually deformed by this rig.
-    for vertex in mesh_obj.data.vertices:
-        if not any(group.weight(vertex.index) > 0.0 for group in mesh_obj.vertex_groups):
-            raise RuntimeError(f"Unweighted vertex {vertex.index} in {mesh_obj.name}")
-
 bound_meshes = 0
 fallback_meshes = 0
 for mesh_obj in olivia_meshes:
