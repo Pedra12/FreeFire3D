@@ -38,7 +38,7 @@ func _spawn_teams() -> void:
 	for i in range(bot_count):
 		var bot := bot_scene.instantiate() as CharacterBody3D
 		if bot == null:
-		 continue
+			continue
 		var team := 0 if i < 3 else 1
 		bot.set("team_id", team)
 		var class_id := ["assault", "medic", "support", "recon"][i % 4]
