@@ -128,8 +128,16 @@ func show_hitmarker(hit: bool, killed: bool = false, headshot: bool = false) -> 
 	hitmarker_headshot = headshot
 	queue_redraw()
 
+func show_round_result(won: bool, round_number: int) -> void:
+	result_text = ("ROUND %d VENCIDO" % round_number) if won else ("ROUND %d PERDIDO" % round_number)
+	queue_redraw()
+
 func show_match_result(won: bool) -> void:
-	result_text = "VITÓRIA" if won else "DERROTA"
+	result_text = "VITÓRIA FINAL" if won else "DERROTA FINAL"
+	queue_redraw()
+
+func clear_result() -> void:
+	result_text = ""
 	queue_redraw()
 
 func toggle_inventory() -> void:
