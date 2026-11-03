@@ -118,16 +118,21 @@ func _audit() -> void:
 	test_root.add_child(bot)
 	await process_frame
 	var bot_mount := bot.get_node_or_null("WeaponMount")
-	if bot_mount == null or not bool(bot_mount.call("equip_weapon", &"assault_rifle")):
-		push_error("WEAPON_AUDIT_FAILED: bot cannot equip weapon")
+	if bot_mount == null:
+		push_error("WEAPON_AUDIT_FAILED: bot weapon mount missing")
 		quit(1)
 		return
-	await create_timer(0.2).timeout
-	if bot_mount.get("mounted_weapon") == null or bot_mount.get("weapon_attachment") == null:
-		push_error("WEAPON_AUDIT_FAILED: bot weapon not visibly mounted")
-		quit(1)
-		return
-	print("BOT_WEAPON_MOUNT_OK weapon=assault_rifle")
+	for bot_weapon_id in WEAPON_PATHS:
+		if not bool(bot_mount.call("equip_weapon", bot_weapon_id)):
+			push_error("WEAPON_AUDIT_FAILED: bot cannot equip " + String(bot_weapon_id))
+			quit(1)
+			return
+		await create_timer(0.12).timeout
+		if bot_mount.get("mounted_weapon") == null or bot_mount.get("weapon_attachment") == null:
+			push_error("WEAPON_AUDIT_FAILED: bot weapon not visibly mounted: " + String(bot_weapon_id))
+			quit(1)
+			return
+		print("BOT_WEAPON_MOUNT_OK weapon=", bot_weapon_id)
 	print("RIG_AND_WEAPON_INTEGRATION_OK: Olivia skeleton=", skeleton.get_bone_count(),
 		" animations=", animation_names.size(), " weapon_classes=", WEAPON_PATHS.size())
 	print("WEAPON_AUDIT_OK")
