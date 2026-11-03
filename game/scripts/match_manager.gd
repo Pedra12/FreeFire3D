@@ -94,8 +94,8 @@ func _finish_round(winner: int) -> void:
 	round_over = true
 	if winner in [0, 1]: round_scores[winner] += 1
 	round_finished.emit(winner, round_number)
-	if is_instance_valid(hud) and hud.has_method("show_match_result"):
-		hud.call("show_match_result", winner == 0)
+	if is_instance_valid(hud) and hud.has_method("show_round_result"):
+		hud.call("show_round_result", winner == 0, round_number)
 	print("ROUND_END round=", round_number, " winner=", winner, " score=", round_scores)
 	_update_hud()
 	if winner in [0, 1] and round_scores[winner] >= rounds_to_win:
@@ -113,6 +113,8 @@ func _transition_round() -> void:
 	if match_over: return
 	round_number += 1
 	round_over = false
+	if is_instance_valid(hud) and hud.has_method("clear_result"):
+		hud.call("clear_result")
 	round_timer = float(round_duration)
 	if is_instance_valid(spawner) and spawner.has_method("deploy_round"):
 		await spawner.call("deploy_round")
