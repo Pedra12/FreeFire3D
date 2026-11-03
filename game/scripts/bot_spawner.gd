@@ -37,6 +37,8 @@ func deploy_round() -> void:
 		bot.set("team_id",team)
 		var cid: String = ["assault","medic","support","recon"][i%4]
 		var weapon: StringName = StringName(String(MatchConfig.CLASSES[cid]["weapon"]))
+		bot.set("class_id", StringName(cid))
+		bot.set("weapon_id", weapon)
 		add_child(bot)
 		bot.global_position = _ground_position((BLUE_SPAWN+BLUE_OFFSETS[i]) if team==0 else (RED_SPAWN+RED_OFFSETS[i-3]),bot)
 		var mount=bot.get_node_or_null("WeaponMount")
