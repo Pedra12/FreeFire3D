@@ -4,7 +4,9 @@ func _initialize() -> void:
 	call_deferred("_run_test")
 
 func _run_test() -> void:
-	MatchConfig.set_selected("recon")
+	var match_config := root.get_node_or_null("MatchConfig")
+	if match_config != null:
+		match_config.call("set_selected", "recon")
 	var packed := load("res://scenes/main.tscn") as PackedScene
 	if packed == null:
 		push_error("MAIN_GAMEPLAY_TEST_FAILED: main scene unavailable")
