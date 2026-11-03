@@ -91,6 +91,9 @@ def segment_distance(point, start, end):
     return (point - (start + direction * t)).length
 
 def fallback_weights(mesh_obj):
+    # Smooth nearest-segment skinning fallback. Four influences with normalized
+    # inverse-distance weights avoid the two-bone hard seams that caused limbs
+    # to collapse when Blender automatic weights failed.
     deform_bones = [b for b in armature.data.bones if b.use_deform]
     if not deform_bones:
         raise RuntimeError("Reference skeleton has no deform bones")
@@ -98,16 +101,20 @@ def fallback_weights(mesh_obj):
     arm_inverse = armature.matrix_world.inverted()
     segments = [(b, b.head_local.copy(), b.tail_local.copy()) for b in deform_bones]
     for vertex in mesh_obj.data.vertices:
-        world_point = mesh_obj.matrix_world @ vertex.co
-        point = arm_inverse @ world_point
-        nearest = sorted(
-            ((segment_distance(point, start, end), bone) for bone, start, end in segments),
-            key=lambda pair: pair[0]
-        )[:2]
-        raw = [1.0 / max(distance, 0.025) ** 2 for distance, _bone in nearest]
+        point = arm_inverse @ (mesh_obj.matrix_world @ vertex.co)
+        nearest = sorted(((segment_distance(point, a, z), bone) for bone, a, z in segments),
+                         key=lambda pair: pair[0])[:4]
+        # Soft falloff; normalize all selected influences to exactly one.
+        raw = [1.0 / max(distance, 0.04) ** 3 for distance, _bone in nearest]
         total = sum(raw)
         for (distance, bone), weight in zip(nearest, raw):
-            bone_groups[bone.name].add([vertex.index], weight / total, "REPLACE")
+            normalized = weight / total
+            if normalized > 0.001:
+                bone_groups[bone.name].add([vertex.index], normalized, "REPLACE")
+    # Ensure every vertex has weights and the mesh is actually deformed by this rig.
+    for vertex in mesh_obj.data.vertices:
+        if not any(group.weight(vertex.index) > 0.0 for group in mesh_obj.vertex_groups):
+            raise RuntimeError(f"Unweighted vertex {vertex.index} in {mesh_obj.name}")
 
 bound_meshes = 0
 fallback_meshes = 0
