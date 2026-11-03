@@ -248,7 +248,8 @@ jobs:
           grep "MAIN_GAMEPLAY_TEST_OK" build/main-gameplay-smoke-test.log
           grep "WEAPON_MOUNT_OK" build/main-gameplay-smoke-test.log
           "$GODOT_BIN" --headless --path game --quit-after 3 2>&1 | tee build/character-select-smoke.log
-          grep "CHARACTER_SELECT_READY classes=4" build/character-select-smoke.log\n          "$GODOT_BIN" --headless --path game res://scenes/main.tscn --quit-after 8 2>&1 | tee build/godot-smoke-test.log
+          grep "CHARACTER_SELECT_READY classes=4" build/character-select-smoke.log
+          "$GODOT_BIN" --headless --path game res://scenes/main.tscn --quit-after 8 2>&1 | tee build/godot-smoke-test.log
           grep "WORLD_COLLISIONS generated=" build/godot-smoke-test.log
           if grep -E "ERROR:|SCRIPT ERROR:" build/godot-import.log build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log build/clocktower-map-audit.log; then exit 1; fi
 
