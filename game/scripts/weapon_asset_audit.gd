@@ -109,6 +109,25 @@ func _audit() -> void:
 			quit(1)
 			return
 		print("WEAPON_EQUIP_OK id=", weapon_id, " magazine=", combat.get("magazine_size"))
+	var bot_scene := load("res://scenes/bot.tscn") as PackedScene
+	if bot_scene == null:
+		push_error("WEAPON_AUDIT_FAILED: bot scene unavailable")
+		quit(1)
+		return
+	var bot := bot_scene.instantiate()
+	test_root.add_child(bot)
+	await process_frame
+	var bot_mount := bot.get_node_or_null("WeaponMount")
+	if bot_mount == null or not bool(bot_mount.call("equip_weapon", &"assault_rifle")):
+		push_error("WEAPON_AUDIT_FAILED: bot cannot equip weapon")
+		quit(1)
+		return
+	await create_timer(0.2).timeout
+	if bot_mount.get("mounted_weapon") == null or bot_mount.get("weapon_attachment") == null:
+		push_error("WEAPON_AUDIT_FAILED: bot weapon not visibly mounted")
+		quit(1)
+		return
+	print("BOT_WEAPON_MOUNT_OK weapon=assault_rifle")
 	print("RIG_AND_WEAPON_INTEGRATION_OK: Olivia skeleton=", skeleton.get_bone_count(),
 		" animations=", animation_names.size(), " weapon_classes=", WEAPON_PATHS.size())
 	print("WEAPON_AUDIT_OK")
