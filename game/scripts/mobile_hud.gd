@@ -224,7 +224,7 @@ func _draw() -> void:
 	_draw_button(medkit_center, "KIT", false, 34.0)
 	_draw_button(inventory_center, "MOCHILA", inventory_open, 36.0)
 	var font: Font = ThemeDB.fallback_font
-	draw_string(font, Vector2(28, 42), "RIVER SIDE | 4V4", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+	draw_string(font, Vector2(28, 42), "CLOCKTOWER | 4V4", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
 	draw_string(font, Vector2(28, 67), "VIDA %d%%" % int(round(health_current / health_maximum * 100.0)), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 	draw_rect(Rect2(28, 75, 180, 10), Color(0.02, 0.03, 0.04, 0.72), true)
 	var health_color := Color(0.20, 0.82, 0.36, 0.95) if health_current > 35.0 else Color(0.95, 0.24, 0.16, 0.98)
