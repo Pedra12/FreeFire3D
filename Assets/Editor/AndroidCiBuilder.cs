@@ -33,7 +33,24 @@ namespace FreeFire3D.EditorTools
 
         public static void Build()
         {
-            Debug.Log("FreeFire3D Android CI: refreshing and importing approved assets.");
+            PrepareProject();
+            BuildAndroidApk();
+        }
+
+        /// <summary>
+        /// Called by Unity Build Automation during Pre-Export. Prepares and validates
+        /// the project, creates generated assets/scenes, and configures Android settings.
+        /// Unity Build Automation then performs the actual cloud build.
+        /// </summary>
+        public static void PrepareForUnityBuildAutomation()
+        {
+            PrepareProject();
+            ConfigureAndroidPlayerSettings();
+        }
+
+        private static void PrepareProject()
+        {
+            Debug.Log("FreeFire3D: refreshing and importing approved assets.");
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             RequireAsset<GameObject>(MapPath, "Clocktower GLB");
@@ -62,7 +79,6 @@ namespace FreeFire3D.EditorTools
                 throw new InvalidOperationException("Match.unity was not generated. Check the Unity import and scene-builder errors above.");
 
             ValidateAndPrepareScene();
-            BuildAndroidApk();
         }
 
         private static T RequireAsset<T>(string path, string label) where T : UnityEngine.Object
@@ -188,12 +204,8 @@ namespace FreeFire3D.EditorTools
                     target.GetType().Name + "." + propertyName + ".");
         }
 
-        private static void BuildAndroidApk()
+        private static void ConfigureAndroidPlayerSettings()
         {
-            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android &&
-                !EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android))
-                throw new InvalidOperationException("Unity could not switch the active build target to Android.");
-
             EditorUserBuildSettings.buildAppBundle = false;
             PlayerSettings.companyName = "Pedra12";
             PlayerSettings.productName = "FreeFire3D";
@@ -203,6 +215,15 @@ namespace FreeFire3D.EditorTools
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.pedra12.freefire3d");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
+        }
+
+        private static void BuildAndroidApk()
+        {
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android &&
+                !EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android))
+                throw new InvalidOperationException("Unity could not switch the active build target to Android.");
+
+            ConfigureAndroidPlayerSettings();
 
             Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
             BuildPlayerOptions options = new BuildPlayerOptions
