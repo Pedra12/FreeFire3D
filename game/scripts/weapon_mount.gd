@@ -21,7 +21,7 @@ var current_weapon_id: StringName = &"awm"
 var _request_id := 0
 
 func _ready() -> void:
-	call_deferred("_attach_weapon")
+	call_deferred("_attach_weapon", _request_id)
 
 func equip_weapon(weapon_id: StringName) -> bool:
 	if not WEAPON_CATALOG.has(weapon_id):
@@ -109,7 +109,7 @@ func _attach_weapon(request_id: int = -1) -> void:
 		var mesh_instance := item as MeshInstance3D
 		if mesh_instance.mesh == null:
 			continue
-		var local_bounds := mesh_instance.transform * mesh_instance.get_aabb()
+		var local_bounds := mesh_instance.get_aabb() * mesh_instance.transform
 		bounds = local_bounds if not has_bounds else bounds.merge(local_bounds)
 		has_bounds = true
 		for surface in range(mesh_instance.mesh.get_surface_count()):
