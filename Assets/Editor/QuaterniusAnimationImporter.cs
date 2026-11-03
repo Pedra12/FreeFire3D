@@ -53,7 +53,7 @@ namespace FreeFire3D.EditorTools
         }
 
         [MenuItem("FreeFire3D/Build Olivia Animation Controller")]
-        private static void BuildController()
+        public static void BuildController()
         {
             AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(AnimationPath)
                 .OfType<AnimationClip>()
