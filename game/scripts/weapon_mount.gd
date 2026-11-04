@@ -19,6 +19,7 @@ var mounted_weapon: Node3D
 var weapon_attachment: Node3D
 var current_weapon_id: StringName = &"awm"
 var _request_id := 0
+var _ik_nodes: Array[Node] = []
 
 func _ready() -> void:
 	call_deferred("_attach_weapon", _request_id)
@@ -72,6 +73,7 @@ func _attach_weapon(request_id: int = -1) -> void:
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	var skeleton: Skeleton3D = skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
 	var hand_index := _find_right_hand(skeleton) if skeleton != null else -1
+	_clear_two_hand_ik()
 	var attachment: Node3D
 	if hand_index >= 0:
 		var bone_attachment := BoneAttachment3D.new()
@@ -130,10 +132,91 @@ func _attach_weapon(request_id: int = -1) -> void:
 		push_warning("WEAPON_MOUNT: invalid weapon bounds")
 		return
 	weapon.scale = Vector3.ONE * (target_weapon_length / longest)
-	weapon.position = -bounds.get_center() * weapon.scale
+	var long_axis := Vector3.RIGHT
+	if bounds.size.y >= bounds.size.x and bounds.size.y >= bounds.size.z:
+		long_axis = Vector3.UP
+	elif bounds.size.z >= bounds.size.x and bounds.size.z >= bounds.size.y:
+		long_axis = Vector3.BACK
+	var character_forward := -model.global_transform.basis.z
+	var forward_in_attachment := attachment.global_transform.basis.inverse() * character_forward
+	if long_axis.dot(forward_in_attachment) < 0.0:
+		long_axis = -long_axis
+	weapon.position = -bounds.get_center() * weapon.scale + long_axis * target_weapon_length * 0.22
 	attachment.add_child(weapon)
+	if skeleton != null and hand_index >= 0:
+		_configure_two_hand_pose(skeleton, model, weapon, long_axis)
 	if is_instance_valid(weapon_attachment):
 		weapon_attachment.queue_free()
 	weapon_attachment = attachment
 	mounted_weapon = weapon
 	print("WEAPON_MOUNT_OK id=", current_weapon_id, " bone=", skeleton.get_bone_name(hand_index) if hand_index >= 0 else "VISIBLE_FALLBACK", " mesh_count=", weapon.find_children("*","MeshInstance3D",true,false).size())
+
+
+func _clear_two_hand_ik() -> void:
+	for node in _ik_nodes:
+		if is_instance_valid(node):
+			node.free()
+	_ik_nodes.clear()
+
+
+func _configure_two_hand_pose(skeleton: Skeleton3D, model: Node3D, weapon: Node3D, long_axis: Vector3) -> void:
+	var right_target := Node3D.new()
+	right_target.name = "WeaponRightHandTarget"
+	model.add_child(right_target)
+	right_target.position = Vector3(0.18, 1.08, -0.26)
+	_ik_nodes.append(right_target)
+	_create_arm_ik(
+		skeleton, model, "RightUpperArm", "RightLowerArm", "RightHand",
+		right_target, "RightArmWeaponIK", 1.0
+	)
+
+	if current_weapon_id != &"pistol":
+		var left_grip := Node3D.new()
+		left_grip.name = "WeaponLeftHandGrip"
+		weapon.add_child(left_grip)
+		left_grip.position = long_axis * target_weapon_length * 0.28 + Vector3.DOWN * 0.025
+		_create_arm_ik(
+			skeleton, model, "LeftUpperArm", "LeftLowerArm", "LeftHand",
+			left_grip, "LeftArmWeaponIK", -1.0
+		)
+		print("WEAPON_TWO_HAND_IK_CONFIGURED weapon=", current_weapon_id)
+	else:
+		print("WEAPON_ONE_HAND_IK_CONFIGURED weapon=", current_weapon_id)
+
+
+func _create_arm_ik(
+	skeleton: Skeleton3D,
+	model: Node3D,
+	root_bone_name: String,
+	middle_bone_name: String,
+	end_bone_name: String,
+	target_node: Node3D,
+	modifier_name: String,
+	side_sign: float
+) -> void:
+	var root_index := skeleton.find_bone(root_bone_name)
+	var middle_index := skeleton.find_bone(middle_bone_name)
+	var end_index := skeleton.find_bone(end_bone_name)
+	if root_index < 0 or middle_index < 0 or end_index < 0:
+		push_warning("WEAPON_IK_SKIPPED missing bones: " + root_bone_name + "/" + middle_bone_name + "/" + end_bone_name)
+		return
+
+	var pole := Node3D.new()
+	pole.name = modifier_name + "Pole"
+	model.add_child(pole)
+	var elbow_local := skeleton.get_bone_global_pose(middle_index).origin
+	var elbow_world := skeleton.to_global(elbow_local)
+	pole.global_position = elbow_world + model.global_transform.basis.x * side_sign * 0.34 + model.global_transform.basis.z * 0.16
+	_ik_nodes.append(pole)
+
+	var ik := TwoBoneIK3D.new()
+	ik.name = modifier_name
+	skeleton.add_child(ik)
+	ik.set_setting_count(1)
+	ik.set_root_bone_name(0, root_bone_name)
+	ik.set_middle_bone_name(0, middle_bone_name)
+	ik.set_end_bone_name(0, end_bone_name)
+	ik.set_target_node(0, ik.get_path_to(target_node))
+	ik.set_pole_node(0, ik.get_path_to(pole))
+	ik.influence = 1.0
+	_ik_nodes.append(ik)
