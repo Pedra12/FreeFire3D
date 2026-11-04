@@ -239,7 +239,7 @@ jobs:
         run: |
           echo "GODOT_IMPORT_START"
           set -o pipefail
-timeout -k 15s 900s "$GODOT_BIN" --headless --editor --path game --import --quit 2>&1 | tee build/godot-import.log
+          timeout -k 15s 900s "$GODOT_BIN" --headless --editor --path game --import --quit 2>&1 | tee build/godot-import.log
           if grep -E "SCRIPT ERROR:|Parse Error:|ERROR: .*\\.gd:|ERROR: No loader found" build/godot-import.log; then exit 1; fi
           echo "GODOT_IMPORT_OK"
 
