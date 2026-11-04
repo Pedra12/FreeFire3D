@@ -253,7 +253,7 @@ jobs:
           grep "WORLD_COLLISIONS generated=" build/godot-smoke-test.log
           if grep -E "SCRIPT ERROR:|Parse Error:|ERROR: .*\\.gd:" build/godot-import.log build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log build/clocktower-map-audit.log; then exit 1; fi
           # Godot 4.7 headless Dummy renderer emits a known material_get_instance_shader_parameters null-RID diagnostic for imported meshes; it is not a GDScript/parser failure. Preserve it in logs for visibility, but do not fail the Android export on this engine-only message.
-          grep -H \'Parameter "material" is null\' build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log || true
+          grep -H 'Parameter "material" is null' build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log || true
 
       - name: Export Android APK
         run: |
