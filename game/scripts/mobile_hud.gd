@@ -73,13 +73,13 @@ func _notification(what: int) -> void:
 
 func _layout() -> void:
 	var s: Vector2 = get_viewport_rect().size
-	joystick_center = Vector2(120.0, s.y - 132.0)
-	jump_center = Vector2(s.x - 92.0, s.y - 105.0)
-	aim_center = Vector2(s.x - 190.0, s.y - 178.0)
-	fire_center = Vector2(s.x - 100.0, s.y - 255.0)
-	reload_center = Vector2(s.x - 285.0, s.y - 105.0)
-	grenade_center = Vector2(s.x - 285.0, s.y - 255.0)
-	medkit_center = Vector2(s.x - 370.0, s.y - 178.0)
+	joystick_center = Vector2(maxf(112.0, s.x * 0.095), s.y - maxf(118.0, s.y * 0.19))
+	jump_center = Vector2(s.x - maxf(88.0, s.x * 0.07), s.y - maxf(98.0, s.y * 0.145))
+	aim_center = Vector2(s.x - maxf(184.0, s.x * 0.145), s.y - maxf(170.0, s.y * 0.245))
+	fire_center = Vector2(s.x - maxf(100.0, s.x * 0.078), s.y - maxf(245.0, s.y * 0.355))
+	reload_center = Vector2(s.x - maxf(278.0, s.x * 0.218), s.y - maxf(102.0, s.y * 0.145))
+	grenade_center = Vector2(s.x - maxf(278.0, s.x * 0.218), s.y - maxf(245.0, s.y * 0.355))
+	medkit_center = Vector2(s.x - maxf(360.0, s.x * 0.282), s.y - maxf(170.0, s.y * 0.245))
 	inventory_center = Vector2(s.x - 100.0, 130.0)
 
 func get_move_vector() -> Vector2:
