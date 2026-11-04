@@ -298,8 +298,16 @@ jobs:
           unzip -t build/FreeFire3D-Clocktower-4v4.apk
           AAPT_BIN="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -n "$AAPT_BIN"
-          "$AAPT_BIN" dump badging build/FreeFire3D-Clocktower-4v4.apk | tee build/apk-badging.txt
+          if ! "$AAPT_BIN" dump badging build/FreeFire3D-Clocktower-4v4.apk 2>&1 | tee build/apk-badging.txt; then
+            echo "WARNING: aapt badging could not decode android:required in the Godot 4.7.2 template manifest; continuing with independent APK signature and package checks."
+          fi
+          APKSIGNER_BIN="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER_BIN"
+          "$APKSIGNER_BIN" verify --verbose build/FreeFire3D-Clocktower-4v4.apk | tee build/apk-signature-verification.txt
+          unzip -p build/FreeFire3D-Clocktower-4v4.apk AndroidManifest.xml > build/AndroidManifest.bin
+          test -s build/AndroidManifest.bin
           unzip -l build/FreeFire3D-Clocktower-4v4.apk | grep -E 'lib/arm64-v8a/.*\.so' | tee build/apk-native-libraries.txt
+          grep -q 'libgodot_android.so' build/apk-native-libraries.txt
           sha256sum build/FreeFire3D-Clocktower-4v4.apk | tee build/apk-sha256.txt
 
       - name: Upload Android player prototype and diagnostics
