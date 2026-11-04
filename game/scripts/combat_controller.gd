@@ -146,7 +146,9 @@ func _shoot_animation_for_weapon() -> StringName:
 	for clip in choices:
 		if player.animation_player != null and player.animation_player.has_animation(clip):
 			return clip
-	return &"Pistol_Shoot"\n\nfunc _fire_once() -> void:
+	return &"Pistol_Shoot"
+
+func _fire_once() -> void:
 	fire_cooldown = fire_interval
 	ammo_in_magazine -= 1
 	if player.has_method("play_action_animation"):
