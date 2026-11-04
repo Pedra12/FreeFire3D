@@ -54,7 +54,7 @@ func _ready() -> void:
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	await _find_ground_and_place()
-	_play_first_available([&"Idle_Loop", &"Idle", &"idle", &"Idle_Rifle"])
+	_play_first_available([&"Pistol_Idle_Loop", &"Pistol_Aim_Neutral", &"Idle_Loop", &"Idle", &"idle", &"Idle_Rifle"])
 	_on_inventory_changed(inventory.call("get_snapshot") if inventory != null else {})
 	_apply_selected_loadout()
 
@@ -68,7 +68,7 @@ func _find_ground_and_place() -> void:
 	query.exclude = [get_rid()]
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
-		global_position = hit.position + Vector3.UP * 0.90
+		global_position = hit.position + Vector3.UP * 0.03
 	else:
 		global_position = Vector3(0.0, 5.0, 0.0)
 

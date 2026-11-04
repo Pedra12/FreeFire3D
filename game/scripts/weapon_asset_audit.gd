@@ -108,6 +108,17 @@ func _audit() -> void:
 			push_error("WEAPON_AUDIT_FAILED: mount did not finish equipping " + String(weapon_id))
 			quit(1)
 			return
+		if weapon_id != &"pistol":
+			var left_ik := skeleton.find_child("LeftArmWeaponIK", true, false) as TwoBoneIK3D
+			if left_ik == null or not left_ik.active:
+				push_error("WEAPON_AUDIT_FAILED: two-hand left-arm IK missing for " + String(weapon_id))
+				quit(1)
+				return
+		else:
+			if skeleton.find_child("LeftArmWeaponIK", true, false) != null:
+				push_error("WEAPON_AUDIT_FAILED: pistol should not retain two-hand IK")
+				quit(1)
+				return
 		print("WEAPON_EQUIP_OK id=", weapon_id, " magazine=", combat.get("magazine_size"))
 	var bot_scene := load("res://scenes/bot.tscn") as PackedScene
 	if bot_scene == null:
@@ -118,7 +129,10 @@ func _audit() -> void:
 	test_root.add_child(bot)
 	await process_frame
 	var bot_mount := bot.get_node_or_null("WeaponMount")
-	if bot_mount == null:
+	var bot_model := bot.get_node_or_null("VisualRoot/CharacterModel") as Node3D
+	var bot_skeletons := bot_model.find_children("*", "Skeleton3D", true, false) if bot_model != null else []
+	var bot_skeleton := bot_skeletons[0] as Skeleton3D if not bot_skeletons.is_empty() else null
+	if bot_mount == null or bot_skeleton == null:
 		push_error("WEAPON_AUDIT_FAILED: bot weapon mount missing")
 		quit(1)
 		return
@@ -132,6 +146,12 @@ func _audit() -> void:
 			push_error("WEAPON_AUDIT_FAILED: bot weapon not visibly mounted: " + String(bot_weapon_id))
 			quit(1)
 			return
+		if bot_weapon_id != &"pistol":
+			var bot_left_ik := bot_skeleton.find_child("LeftArmWeaponIK", true, false) as TwoBoneIK3D
+			if bot_left_ik == null or not bot_left_ik.active:
+				push_error("WEAPON_AUDIT_FAILED: bot two-hand IK missing for " + String(bot_weapon_id))
+				quit(1)
+				return
 		print("BOT_WEAPON_MOUNT_OK weapon=", bot_weapon_id)
 	print("RIG_AND_WEAPON_INTEGRATION_OK: Olivia skeleton=", skeleton.get_bone_count(),
 		" animations=", animation_names.size(), " weapon_classes=", WEAPON_PATHS.size())

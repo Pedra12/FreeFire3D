@@ -113,6 +113,9 @@ func reload() -> void:
 	if reloading or ammo_in_magazine >= magazine_size or reserve_ammo <= 0:
 		return
 	reloading = true
+	var weapon_mount := player.get_node_or_null("WeaponMount")
+	if is_instance_valid(weapon_mount) and weapon_mount.has_method("set_offhand_ik_active"):
+		weapon_mount.call("set_offhand_ik_active", false)
 	if player.has_method("play_action_animation"):
 		player.play_action_animation(&"Pistol_Reload")
 	await get_tree().create_timer(reload_duration).timeout
@@ -124,6 +127,8 @@ func reload() -> void:
 		loaded = int(inventory.call("consume_ammo", needed, current_ammo_type))
 	ammo_in_magazine += loaded
 	reserve_ammo = int(inventory.call("get_ammo", current_ammo_type)) if inventory != null else maxi(0, reserve_ammo - loaded)
+	if is_instance_valid(weapon_mount) and weapon_mount.has_method("set_offhand_ik_active"):
+		weapon_mount.call("set_offhand_ik_active", true)
 	reloading = false
 	_emit_ammo()
 

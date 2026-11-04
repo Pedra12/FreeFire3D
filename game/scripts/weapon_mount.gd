@@ -20,6 +20,7 @@ var weapon_attachment: Node3D
 var current_weapon_id: StringName = &"awm"
 var _request_id := 0
 var _ik_nodes: Array[Node] = []
+var _offhand_ik: TwoBoneIK3D
 
 func _ready() -> void:
 	call_deferred("_attach_weapon", _request_id)
@@ -157,6 +158,12 @@ func _clear_two_hand_ik() -> void:
 		if is_instance_valid(node):
 			node.free()
 	_ik_nodes.clear()
+	_offhand_ik = null
+
+
+func set_offhand_ik_active(enabled: bool) -> void:
+	if is_instance_valid(_offhand_ik):
+		_offhand_ik.active = enabled
 
 
 func _configure_two_hand_pose(skeleton: Skeleton3D, model: Node3D, weapon: Node3D, long_axis: Vector3) -> void:
@@ -175,13 +182,34 @@ func _configure_two_hand_pose(skeleton: Skeleton3D, model: Node3D, weapon: Node3
 		left_grip.name = "WeaponLeftHandGrip"
 		weapon.add_child(left_grip)
 		left_grip.position = long_axis * target_weapon_length * 0.28 + Vector3.DOWN * 0.025
-		_create_arm_ik(
+		_offhand_ik = _create_arm_ik(
 			skeleton, model, "LeftUpperArm", "LeftLowerArm", "LeftHand",
 			left_grip, "LeftArmWeaponIK", -1.0
 		)
 		print("WEAPON_TWO_HAND_IK_CONFIGURED weapon=", current_weapon_id)
 	else:
 		print("WEAPON_ONE_HAND_IK_CONFIGURED weapon=", current_weapon_id)
+
+
+func _resolve_bone_alias(skeleton: Skeleton3D, requested: String) -> String:
+	var candidates: Array[String] = [requested]
+	match requested:
+		"RightUpperArm":
+			candidates.append_array(["upperarm_r", "RightArm", "mixamorig:RightArm"])
+		"RightLowerArm":
+			candidates.append_array(["lowerarm_r", "RightForeArm", "mixamorig:RightForeArm"])
+		"RightHand":
+			candidates.append_array(["hand_r", "mixamorig:RightHand"])
+		"LeftUpperArm":
+			candidates.append_array(["upperarm_l", "LeftArm", "mixamorig:LeftArm"])
+		"LeftLowerArm":
+			candidates.append_array(["lowerarm_l", "LeftForeArm", "mixamorig:LeftForeArm"])
+		"LeftHand":
+			candidates.append_array(["hand_l", "mixamorig:LeftHand"])
+	for candidate in candidates:
+		if skeleton.find_bone(candidate) >= 0:
+			return candidate
+	return ""
 
 
 func _create_arm_ik(
@@ -193,13 +221,16 @@ func _create_arm_ik(
 	target_node: Node3D,
 	modifier_name: String,
 	side_sign: float
-) -> void:
-	var root_index := skeleton.find_bone(root_bone_name)
-	var middle_index := skeleton.find_bone(middle_bone_name)
-	var end_index := skeleton.find_bone(end_bone_name)
+) -> TwoBoneIK3D:
+	var resolved_root := _resolve_bone_alias(skeleton, root_bone_name)
+	var resolved_middle := _resolve_bone_alias(skeleton, middle_bone_name)
+	var resolved_end := _resolve_bone_alias(skeleton, end_bone_name)
+	var root_index := skeleton.find_bone(resolved_root)
+	var middle_index := skeleton.find_bone(resolved_middle)
+	var end_index := skeleton.find_bone(resolved_end)
 	if root_index < 0 or middle_index < 0 or end_index < 0:
-		push_warning("WEAPON_IK_SKIPPED missing bones: " + root_bone_name + "/" + middle_bone_name + "/" + end_bone_name)
-		return
+		push_warning("WEAPON_IK_SKIPPED missing bones: " + root_bone_name + "/" + middle_bone_name + "/" + end_bone_name + " resolved=" + resolved_root + "/" + resolved_middle + "/" + resolved_end)
+		return null
 
 	var pole := Node3D.new()
 	pole.name = modifier_name + "Pole"
@@ -213,9 +244,9 @@ func _create_arm_ik(
 	ik.name = modifier_name
 	skeleton.add_child(ik)
 	ik.set_setting_count(1)
-	ik.set_root_bone_name(0, root_bone_name)
-	ik.set_middle_bone_name(0, middle_bone_name)
-	ik.set_end_bone_name(0, end_bone_name)
+	ik.set_root_bone_name(0, resolved_root)
+	ik.set_middle_bone_name(0, resolved_middle)
+	ik.set_end_bone_name(0, resolved_end)
 	ik.set_target_node(0, ik.get_path_to(target_node))
 	ik.set_pole_node(0, ik.get_path_to(pole))
 	ik.influence = 1.0
