@@ -251,3 +251,4 @@ func _create_arm_ik(
 	ik.set_pole_node(0, ik.get_path_to(pole))
 	ik.influence = 1.0
 	_ik_nodes.append(ik)
+	return ik
