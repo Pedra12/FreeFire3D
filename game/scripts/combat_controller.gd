@@ -127,7 +127,21 @@ func reload() -> void:
 	reloading = false
 	_emit_ammo()
 
-func _shoot_animation_for_weapon() -> StringName:\n\tvar choices: Array[StringName] = [&"Rifle_Shoot", &"Assault_Rifle_Shoot", &"Pistol_Shoot"]\n\tmatch current_weapon_id:\n\t\t&"awm": choices = [&"Sniper_Shoot", &"Rifle_Shoot", &"Pistol_Shoot"]\n\t\t&"shotgun": choices = [&"Shotgun_Shoot", &"Rifle_Shoot", &"Pistol_Shoot"]\n\t\t&"smg": choices = [&"SMG_Shoot", &"Rifle_Shoot", &"Pistol_Shoot"]\n\tfor clip in choices:\n\t\tif player.animation_player != null and player.animation_player.has_animation(clip): return clip\n\treturn &"Pistol_Shoot"\n\nfunc _fire_once() -> void:
+func _shoot_animation_for_weapon() -> StringName:
+	var choices: Array[StringName] = [&"Pistol_Shoot"]
+	match current_weapon_id:
+		&"awm":
+			choices = [&"Pistol_Shoot"]
+		&"shotgun":
+			choices = [&"Pistol_Shoot"]
+		&"smg":
+			choices = [&"Pistol_Shoot"]
+		&"assault_rifle":
+			choices = [&"Pistol_Shoot"]
+	for clip in choices:
+		if player.animation_player != null and player.animation_player.has_animation(clip):
+			return clip
+	return &"Pistol_Shoot"\n\nfunc _fire_once() -> void:
 	fire_cooldown = fire_interval
 	ammo_in_magazine -= 1
 	if player.has_method("play_action_animation"):
