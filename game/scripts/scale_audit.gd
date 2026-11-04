@@ -22,11 +22,24 @@ func _audit() -> void:
 		return
 	var map_bounds := _combined_bounds(map_node)
 	var model_bounds := _combined_bounds(model_node)
+	var model_world_height := model_bounds.size.y * model_node.global_transform.basis.y.length()
+	var capsule_node := player_node.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	var capsule := capsule_node.shape as CapsuleShape3D if capsule_node != null else null
 	print("SCALE_AUDIT map_scale=", map_node.scale,
 		" map_size=", map_bounds.size,
 		" model_size=", model_bounds.size,
+		" model_world_height=", model_world_height,
+		" capsule_height=", capsule.height if capsule != null else -1.0,
 		" player_scale=", player_node.scale,
 		" model_local_scale=", model_node.scale)
+	if model_world_height < 1.65 or model_world_height > 1.95:
+		push_error("SCALE_AUDIT: player model must be close to human height; measured ", model_world_height)
+		quit(4)
+		return
+	if capsule == null or capsule.height < 1.7:
+		push_error("SCALE_AUDIT: player collision capsule does not match the full-height model")
+		quit(5)
+		return
 	var entries: Array[Dictionary] = []
 	for child in map_node.find_children("*", "MeshInstance3D", true, false):
 		var mesh_node := child as MeshInstance3D
