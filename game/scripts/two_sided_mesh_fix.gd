@@ -59,6 +59,7 @@ func _fix_mesh(mesh_node: MeshInstance3D) -> void:
 			safe_material = fallback
 			_fallback_surfaces += 1
 		safe_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		safe_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		mesh_node.set_surface_override_material(surface, safe_material)
 		_fixed_surfaces += 1
 	_seen[mesh_id] = true
