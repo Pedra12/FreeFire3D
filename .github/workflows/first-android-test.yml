@@ -63,8 +63,8 @@ jobs:
 
       - name: Convert compact Clocktower map with textures and collisions
         run: |
-          timeout 120s sudo apt-get update
-          timeout 180s sudo apt-get install -y blender xz-utils unzip curl libegl1
+          sudo timeout 120s apt-get update
+          sudo timeout 180s apt-get install -y blender xz-utils unzip curl libegl1
           mkdir -p /opt/blender game/assets/maps build/clocktower/source
           if curl -L --fail --retry 2 --connect-timeout 30 --max-time 240 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz; then
             tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
