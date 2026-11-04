@@ -56,7 +56,33 @@ func _ready() -> void:
 		global_position.y = float(hit.position.y) + 0.70
 	_play([&"Idle", &"idle", &"Idle_Rifle"])
 
-func _apply_class_profile() -> void:\n\tmatch class_id:\n\t\t&"assault":\n\t\t\tattack_damage = 14.0; attack_interval = 0.24; attack_range = 34.0; magazine_size = 30; reload_duration = 2.0\n\t\t&"medic":\n\t\t\tattack_damage = 10.0; attack_interval = 0.13; attack_range = 24.0; magazine_size = 32; reload_duration = 1.65\n\t\t&"support":\n\t\t\tattack_damage = 8.0; attack_interval = 0.72; attack_range = 12.0; magazine_size = 6; reload_duration = 2.4\n\t\t&"recon":\n\t\t\tattack_damage = 42.0; attack_interval = 1.45; attack_range = 48.0; magazine_size = 5; reload_duration = 2.5\n\t\t\tmove_speed = 2.65\n\nfunc _physics_process(delta: float) -> void:
+func _apply_class_profile() -> void:
+	match class_id:
+		&"assault":
+			attack_damage = 14.0
+			attack_interval = 0.24
+			attack_range = 34.0
+			magazine_size = 30
+			reload_duration = 2.0
+		&"medic":
+			attack_damage = 10.0
+			attack_interval = 0.13
+			attack_range = 24.0
+			magazine_size = 32
+			reload_duration = 1.65
+		&"support":
+			attack_damage = 8.0
+			attack_interval = 0.72
+			attack_range = 12.0
+			magazine_size = 6
+			reload_duration = 2.4
+		&"recon":
+			attack_damage = 42.0
+			attack_interval = 1.45
+			attack_range = 48.0
+			magazine_size = 5
+			reload_duration = 2.5
+			move_speed = 2.65\n\nfunc _physics_process(delta: float) -> void:
 	if not alive:
 		return
 	attack_timer = maxf(0.0, attack_timer - delta)
@@ -155,7 +181,12 @@ func _attack_target() -> void:
 	_play_action(_shoot_animation_for_weapon())
 	var from := global_position + Vector3.UP * 1.2
 	var to := target.global_position + Vector3.UP * 1.15
-	var spread_scale := 0.012 if class_id == &"recon" else (0.065 if class_id == &"support" else 0.035)\n\tvar spread := Vector3(randf_range(-spread_scale, spread_scale), randf_range(-spread_scale * 0.7, spread_scale * 0.7), randf_range(-spread_scale, spread_scale))
+	var spread_scale := 0.012 if class_id == &"recon" else (0.065 if class_id == &"support" else 0.035)
+	var spread := Vector3(
+		randf_range(-spread_scale, spread_scale),
+		randf_range(-spread_scale * 0.7, spread_scale * 0.7),
+		randf_range(-spread_scale, spread_scale)
+	)
 	to += spread * from.distance_to(to)
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.exclude = [get_rid()]
