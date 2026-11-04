@@ -27,6 +27,9 @@ var action_animation_locked: bool = false
 var footstep_clock: float = 0.0
 var last_grounded: bool = true
 var vault_cooldown: float = 0.0
+var weapon_animation_id: StringName = &"assault_rifle"
+var camera_sensitivity: float = 0.006
+var camera_follow_smoothing: float = 12.0
 
 func _ready() -> void:
 	add_to_group("player")
@@ -87,7 +90,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _rotate_camera(delta: Vector2) -> void:
 	camera_yaw -= delta.x * 0.006
-	camera_pitch = clampf(camera_pitch - delta.y * 0.0035, -0.45, 0.42)
+	camera_pitch = clampf(camera_pitch - delta.y * 0.0035, -0.48, 0.38)
 
 func _physics_process(delta: float) -> void:
 	vault_cooldown = maxf(0.0, vault_cooldown - delta)
@@ -115,14 +118,14 @@ func _physics_process(delta: float) -> void:
 	var target_speed: float = sprint_speed if sprinting else walk_speed
 
 	if direction.length() > 0.01:
-		velocity.x = direction.x * target_speed
-		velocity.z = direction.z * target_speed
+		velocity.x = move_toward(velocity.x, direction.x * target_speed, walk_speed * 10.0 * delta)
+		velocity.z = move_toward(velocity.z, direction.z * target_speed, walk_speed * 10.0 * delta)
 		var facing_direction := forward if aiming else direction
 		var target_angle: float = atan2(facing_direction.x, facing_direction.z)
 		visual.rotation.y = lerp_angle(visual.rotation.y, target_angle, turn_speed * delta)
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, walk_speed * 7.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, walk_speed * 7.0 * delta)
+		velocity.x = move_toward(velocity.x, 0.0, walk_speed * 9.0 * delta)
+		velocity.z = move_toward(velocity.z, 0.0, walk_speed * 9.0 * delta)
 		if aiming:
 			var aim_angle := atan2(forward.x, forward.z)
 			visual.rotation.y = lerp_angle(visual.rotation.y, aim_angle, turn_speed * delta)
@@ -161,11 +164,11 @@ func _physics_process(delta: float) -> void:
 			else:
 				_play_first_available([&"Idle_Loop", &"Idle", &"idle", &"Idle_Rifle"])
 
-	camera_pivot.global_position = camera_pivot.global_position.lerp(global_position + Vector3.UP * camera_height, 1.0 - exp(-10.0 * delta))
+	camera_pivot.global_position = camera_pivot.global_position.lerp(global_position + Vector3.UP * camera_height, 1.0 - exp(-camera_follow_smoothing * delta))
 	camera_pivot.rotation.y = camera_yaw
 	camera_pivot.rotation.x = camera_pitch
 	camera.position = camera.position.lerp(Vector3(0.0, 0.0, camera_distance), 1.0 - exp(-8.0 * delta))
-	camera.look_at(global_position + Vector3.UP * 1.25 + forward * 8.0, Vector3.UP)
+	camera.look_at(camera_pivot.global_position + Vector3.UP * (0.05 + camera_pitch * 0.35) + forward * 8.0, Vector3.UP)
 
 func _try_window_vault(forward: Vector3) -> bool:
 	if vault_cooldown > 0.0 or forward.length() < 0.1:
@@ -279,6 +282,7 @@ func _apply_selected_loadout() -> void:
 		return
 	var data: Dictionary = MatchConfig.get_selected()
 	var weapon_id := StringName(String(data.get("weapon", "assault_rifle")))
+	weapon_animation_id = weapon_id
 	var mount := get_node_or_null("WeaponMount")
 	var combat := get_node_or_null("CombatController")
 	if mount != null:
