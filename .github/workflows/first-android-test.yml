@@ -221,7 +221,7 @@ jobs:
               target.write_bytes(z.read(entry))
               print("OLIVIA_SOURCE_EXTRACTED",entry,target.stat().st_size)
           PY
-          /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/rig_olivia.py -- game/assets/characters/female_player_rigged.glb game/assets/characters/olivia_source.glb game/assets/characters/olivia_rigged.glb 2>&1 | tee build/olivia-rigging.log
+          timeout -k 10s 180s /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/rig_olivia.py -- game/assets/characters/female_player_rigged.glb game/assets/characters/olivia_source.glb game/assets/characters/olivia_rigged.glb 2>&1 | tee build/olivia-rigging.log
           grep "OLIVIA_RIG_OK" build/olivia-rigging.log
           test -s game/assets/characters/olivia_rigged.glb
 
