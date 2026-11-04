@@ -15,6 +15,10 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
@@ -234,8 +238,9 @@ jobs:
       - name: Import Godot project
         run: |
           echo "GODOT_IMPORT_START"
-          timeout -k 10s 180s "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
-          if grep -E "SCRIPT ERROR:|Parse Error:|ERROR: .*\\.gd:" build/godot-import.log; then exit 1; fi
+          set -o pipefail
+timeout -k 15s 900s "$GODOT_BIN" --headless --editor --path game --import --quit 2>&1 | tee build/godot-import.log
+          if grep -E "SCRIPT ERROR:|Parse Error:|ERROR: .*\\.gd:|ERROR: No loader found" build/godot-import.log; then exit 1; fi
           echo "GODOT_IMPORT_OK"
 
       - name: Audit Clocktower map
