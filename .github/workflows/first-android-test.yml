@@ -63,10 +63,10 @@ jobs:
 
       - name: Convert compact Clocktower map with textures and collisions
         run: |
-          sudo apt-get update
-          sudo apt-get install -y blender xz-utils unzip curl libegl1
+          timeout 120s sudo apt-get update
+          timeout 180s sudo apt-get install -y blender xz-utils unzip curl libegl1
           mkdir -p /opt/blender game/assets/maps build/clocktower/source
-          if curl -L --fail --retry 2 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz; then
+          if curl -L --fail --retry 2 --connect-timeout 30 --max-time 240 https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz -o /tmp/blender.tar.xz; then
             tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
           else
             echo "Official Blender archive unavailable; using Ubuntu Blender package"
@@ -99,7 +99,7 @@ jobs:
           export CLOCKTOWER_ROOT="$PWD/build/clocktower/source"
           export CLOCKTOWER_BLEND="$PWD/$(cat build/clocktower/source-path.txt)"
           export CLOCKTOWER_GLB="$PWD/game/assets/maps/clocktower.glb"
-          /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/convert_clocktower.py 2>&1 | tee build/clocktower-conversion.log
+          timeout 240s /opt/blender/blender -b -t 2 --python-exit-code 1 --python tools/convert_clocktower.py 2>&1 | tee build/clocktower-conversion.log
           grep "CLOCKTOWER_GLB_OK" build/clocktower-conversion.log
           test -s game/assets/maps/clocktower.glb
           test "$(stat -c%s game/assets/maps/clocktower.glb)" -gt 5000000
@@ -231,26 +231,56 @@ jobs:
           keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           sed -i "s|__DEBUG_KEYSTORE__|$HOME/.android/debug.keystore|g" game/export_presets.cfg
 
-      - name: Import and validate Godot project
+      - name: Import Godot project
         run: |
-          "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/clocktower_map_audit.gd 2>&1 | tee build/clocktower-map-audit.log
+          echo "GODOT_IMPORT_START"
+          timeout 180s "$GODOT_BIN" --headless --editor --path game --quit 2>&1 | tee build/godot-import.log
+          if grep -E "SCRIPT ERROR:|Parse Error:|ERROR: .*\\.gd:" build/godot-import.log; then exit 1; fi
+          echo "GODOT_IMPORT_OK"
+
+      - name: Audit Clocktower map
+        run: |
+          timeout 90s "$GODOT_BIN" --headless --path game --script res://scripts/clocktower_map_audit.gd 2>&1 | tee build/clocktower-map-audit.log
           grep "CLOCKTOWER_MAP_AUDIT_OK" build/clocktower-map-audit.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/olivia_rig_audit.gd 2>&1 | tee build/olivia-rig-godot-audit.log
+
+      - name: Audit Olivia rig and animations
+        run: |
+          timeout 90s "$GODOT_BIN" --headless --path game --script res://scripts/olivia_rig_audit.gd 2>&1 | tee build/olivia-rig-godot-audit.log
           grep "OLIVIA_RIG_GODOT_OK" build/olivia-rig-godot-audit.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/scale_audit.gd 2>&1 | tee build/scale-audit.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/weapon_asset_audit.gd 2>&1 | tee build/weapon-asset-audit.log
+
+      - name: Audit player scale and collision
+        run: |
+          timeout 90s "$GODOT_BIN" --headless --path game --script res://scripts/scale_audit.gd 2>&1 | tee build/scale-audit.log
+
+      - name: Audit weapon models and two-hand IK
+        run: |
+          timeout 120s "$GODOT_BIN" --headless --path game --script res://scripts/weapon_asset_audit.gd 2>&1 | tee build/weapon-asset-audit.log
           grep "WEAPON_AUDIT_OK" build/weapon-asset-audit.log
           grep "WEAPON_MOUNT_OK" build/weapon-asset-audit.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/combat_smoke_test.gd 2>&1 | tee build/combat-smoke-test.log
+
+      - name: Run combat smoke test
+        run: |
+          timeout 90s "$GODOT_BIN" --headless --path game --script res://scripts/combat_smoke_test.gd 2>&1 | tee build/combat-smoke-test.log
           grep "COMBAT_TEST_OK" build/combat-smoke-test.log
-          "$GODOT_BIN" --headless --path game --script res://scripts/main_gameplay_smoke_test.gd 2>&1 | tee build/main-gameplay-smoke-test.log
+
+      - name: Run full match gameplay smoke test
+        run: |
+          timeout 120s "$GODOT_BIN" --headless --path game --script res://scripts/main_gameplay_smoke_test.gd 2>&1 | tee build/main-gameplay-smoke-test.log
           grep "MAIN_GAMEPLAY_TEST_OK" build/main-gameplay-smoke-test.log
           grep "WEAPON_MOUNT_OK" build/main-gameplay-smoke-test.log
-          "$GODOT_BIN" --headless --path game --quit-after 3 2>&1 | tee build/character-select-smoke.log
+
+      - name: Run character selection smoke test
+        run: |
+          timeout 45s "$GODOT_BIN" --headless --path game --quit-after 3 2>&1 | tee build/character-select-smoke.log
           grep "CHARACTER_SELECT_READY classes=4" build/character-select-smoke.log
-          "$GODOT_BIN" --headless --path game res://scenes/main.tscn --quit-after 8 2>&1 | tee build/godot-smoke-test.log
+
+      - name: Run 3D world smoke test
+        run: |
+          timeout 60s "$GODOT_BIN" --headless --path game res://scenes/main.tscn --quit-after 8 2>&1 | tee build/godot-smoke-test.log
           grep "WORLD_COLLISIONS generated=" build/godot-smoke-test.log
+
+      - name: Check Godot diagnostics
+        run: |
           if grep -E "SCRIPT ERROR:|Parse Error:|ERROR: .*\\.gd:" build/godot-import.log build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log build/clocktower-map-audit.log; then exit 1; fi
           # Godot 4.7 headless Dummy renderer emits a known material_get_instance_shader_parameters null-RID diagnostic for imported meshes; it is not a GDScript/parser failure. Preserve it in logs for visibility, but do not fail the Android export on this engine-only message.
           grep -H 'Parameter "material" is null' build/godot-smoke-test.log build/combat-smoke-test.log build/main-gameplay-smoke-test.log build/weapon-asset-audit.log || true
