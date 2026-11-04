@@ -24,10 +24,14 @@ func _on_node_added(node: Node) -> void:
 func _scan_tree(root: Node) -> void:
 	if not is_instance_valid(root):
 		return
+	var before_fixed := _fixed_surfaces
+	var before_fallback := _fallback_surfaces
 	if root is MeshInstance3D:
 		_fix_mesh(root as MeshInstance3D)
 	for child in root.get_children():
 		_scan_tree(child)
+	if _fixed_surfaces > before_fixed or _fallback_surfaces > before_fallback:
+		print("TWO_SIDED_MATERIALS_OK fixed=", _fixed_surfaces, " fallback=", _fallback_surfaces)
 
 func _fix_mesh(mesh_node: MeshInstance3D) -> void:
 	if not is_instance_valid(mesh_node) or mesh_node.mesh == null:
@@ -58,5 +62,3 @@ func _fix_mesh(mesh_node: MeshInstance3D) -> void:
 		mesh_node.set_surface_override_material(surface, safe_material)
 		_fixed_surfaces += 1
 	_seen[mesh_id] = true
-	if _fixed_surfaces > 0:
-		print("TWO_SIDED_MATERIALS_OK fixed=", _fixed_surfaces, " fallback=", _fallback_surfaces)
