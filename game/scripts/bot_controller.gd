@@ -53,7 +53,7 @@ func _ready() -> void:
 	query.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
-		global_position.y = float(hit.position.y) + 0.70
+		global_position.y = float(hit.position.y) + 0.90
 	_play([&"Idle", &"idle", &"Idle_Rifle"])
 
 func _apply_class_profile() -> void:
