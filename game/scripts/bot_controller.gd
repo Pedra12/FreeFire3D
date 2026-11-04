@@ -82,7 +82,9 @@ func _apply_class_profile() -> void:
 			attack_range = 48.0
 			magazine_size = 5
 			reload_duration = 2.5
-			move_speed = 2.65\n\nfunc _physics_process(delta: float) -> void:
+			move_speed = 2.65
+
+func _physics_process(delta: float) -> void:
 	if not alive:
 		return
 	attack_timer = maxf(0.0, attack_timer - delta)
